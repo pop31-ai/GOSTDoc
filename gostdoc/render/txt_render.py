@@ -54,6 +54,12 @@ def render_txt(proj: Project, out_path: Path, doc_code: str = "19.402") -> Path:
         for m in cls.methods:
             kind = {"signal": "сигнал", "slot": "слот"}.get(m.kind, "метод")
             lines.append(f"  - {kind}: {m.return_type} {m.name}({', '.join(m.params)})")
+            if m.brief:
+                lines.append(f"        описание: {m.brief}")
+            for pname, pdesc in m.params_doc.items():
+                lines.append(f"        параметр {pname}: {pdesc}")
+            if m.returns:
+                lines.append(f"        возвращает: {m.returns}")
             for c in m.calls:
                 lines.append(f"        -> {c}()")
             for s, r, sig, slot in m.connections:
@@ -92,6 +98,15 @@ def render_txt(proj: Project, out_path: Path, doc_code: str = "19.402") -> Path:
                 continue
             for i, line in enumerate(code.splitlines(), start=1):
                 lines.append(f"{i:>5} | {line}")
+
+    from .bodies import REV_HEADERS, revision_rows
+    lines.append("")
+    lines.append("Лист регистрации изменений")
+    lines.append("=" * 72)
+    lines.append(" | ".join(REV_HEADERS))
+    lines.append("-" * 72)
+    for row in revision_rows():
+        lines.append(" | ".join(row))
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out_path

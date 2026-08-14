@@ -94,7 +94,7 @@ def test_doctype_all(tmp_path: Path):
     results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
                          ("txt",), name="D", doctype="all")
     codes = {p.stem.split("_")[0] for p in results}
-    assert codes == {"19.401", "19.402", "19.403", "19.404", "19.505"}
+    assert codes == {"19.401", "19.402", "19.403", "19.404", "19.504", "19.505"}
 
 
 def test_docs_all_codes_render_pdf(tmp_path: Path):
@@ -207,3 +207,43 @@ def test_build_docs_zip(tmp_path: Path):
     with zipfile.ZipFile(zip_path) as zf:
         names = zf.namelist()
     assert any(n.endswith(".txt") for n in names)
+
+
+DOXY_SRC = """
+// Класс обработки изображений.
+class Img {
+public:
+    /** Выполняет бинаризацию изображения.
+     *  @param[in] src исходное изображение
+     *  @param threshold порог яркости
+     *  @return результат в градациях чёрного и белого
+     */
+    QImage binarize(const QImage& src, int threshold);
+};
+"""
+
+
+def test_doxygen_comments(tmp_path: Path):
+    f = tmp_path / "d.h"
+    f.write_text(DOXY_SRC, encoding="utf-8")
+    classes, _en, _td, _ns = parse_file(f)
+    m = next(m for m in classes[0].methods if m.name == "binarize")
+    assert "бинаризацию" in m.brief
+    assert "src" in m.params_doc and "порог" in m.params_doc["threshold"]
+    assert "градациях" in m.returns
+
+
+def test_doc_19504(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("txt",), name="P", doctype="19.504")
+    text = results[0].read_text(encoding="utf-8")
+    assert "Руководство программиста" in text
+    assert "Структура программы" in text
+
+
+def test_revision_register(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("txt", "docx", "pdf"), name="R")
+    txt = results[0].read_text(encoding="utf-8")
+    assert "Лист регистрации изменений" in txt
+    assert "Номер изм." in txt

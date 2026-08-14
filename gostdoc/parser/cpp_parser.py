@@ -96,6 +96,33 @@ def _parse_params(params: str) -> list[str]:
     return [p.strip() for p in params.split(",") if p.strip() and p.strip() != "..."]
 
 
+_TAG_NEXT = r"(?!\s@[a-z]+\b)"
+_DOXY_TEMPERED = r"((?:" + _TAG_NEXT + r".)*)"
+_DOXY_BRIEF_RE = re.compile(r"@brief\s+" + _DOXY_TEMPERED, re.I | re.S)
+_DOXY_PARAM_RE = re.compile(
+    r"@param(?:\[[^\]]+\])?\s+(\w+)\s*:?\s*" + _DOXY_TEMPERED, re.I)
+_DOXY_RETURN_RE = re.compile(r"@return\s+" + _DOXY_TEMPERED, re.I)
+
+
+def _parse_doxygen(comment: str) -> tuple[str, dict[str, str], str]:
+    """Извлекает Doxygen-поля @brief, @param, @return из комментария."""
+    brief = ""
+    m = _DOXY_BRIEF_RE.search(comment)
+    if m:
+        brief = " ".join(m.group(1).split())
+    else:
+        first = re.split(r"\s@[a-z]+\b", comment, maxsplit=1)[0]
+        brief = " ".join(first.split())
+    params: dict[str, str] = {}
+    for m in _DOXY_PARAM_RE.finditer(comment):
+        params[m.group(1)] = " ".join(m.group(2).split())
+    returns = ""
+    m = _DOXY_RETURN_RE.search(comment)
+    if m:
+        returns = " ".join(m.group(1).split())
+    return brief, params, returns
+
+
 def _last_comment(raw_lines: list[str], idx: int) -> str:
     """Комментарий, стоящий над строкой idx (строки /— // или /**)."""
     out: list[str] = []
@@ -112,6 +139,16 @@ def _last_comment(raw_lines: list[str], idx: int) -> str:
         else:
             break
     return " ".join(reversed(out)).strip()
+
+
+def _strip_block_comments(raw: str) -> str:
+    """Удаляет блочные комментарии, сохраняя число строк (нужно для
+    совпадения номеров строк со строками исходника)."""
+
+    def repl(m: re.Match) -> str:
+        return "\n" * m.group(0).count("\n")
+
+    return _COMMENT_BLOCK_RE.sub(repl, raw)
 
 
 def _balance_index(lines: list[str], start: int) -> int:
@@ -131,7 +168,7 @@ def parse_file(path: str | Path) -> tuple[list[Class], list[Enum], list[TypeDef]
     """Парсит один файл: классы, перечисления, typedef'ы, пространства имён."""
     path = Path(path)
     raw = path.read_text(encoding="utf-8", errors="ignore")
-    src = _COMMENT_BLOCK_RE.sub("", raw)
+    src = _strip_block_comments(raw)
     lines = src.splitlines()
     raw_lines = raw.splitlines()
 
@@ -184,7 +221,7 @@ def parse_file(path: str | Path) -> tuple[list[Class], list[Enum], list[TypeDef]
                     comment=_last_comment(raw_lines, i))
         body_end = _balance_index(lines, i)
         body = "\n".join(lines[i + 1:body_end])
-        cls.fields, cls.methods = _parse_class_body(body, path.name, lines, i + 1)
+        cls.fields, cls.methods = _parse_class_body(body, path.name, raw_lines, i + 1)
         classes.append(cls)
         i = body_end + 1
     return classes, enums, typedefs, namespaces
@@ -207,13 +244,15 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                 lineno = body_start_line + running + k
                 mm = _DECL_RE.match(line)
                 if mm:
+                    comment = _last_comment(src_lines, lineno)
+                    brief, params_doc, returns = _parse_doxygen(comment)
                     func = Function(
                         name=mm.group(3),
                         return_type=(mm.group(1) + " " if mm.group(1) else "") + mm.group(2).strip(),
                         params=_parse_params(mm.group(4)),
                         file=file, line=lineno, is_method=True,
-                        comment=_last_comment(src_lines, lineno),
-                        kind=kind)
+                        comment=comment, kind=kind,
+                        brief=brief, params_doc=params_doc, returns=returns)
                     if mm.group(5) == "{":
                         body_start = body_lines.index(line, k)
                         # считаем конец тела
@@ -233,24 +272,28 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                     continue
                 cm = _CTOR_RE.match(line)
                 if cm and not _DECL_RE.match(line):
+                    comment = _last_comment(src_lines, lineno)
+                    brief, params_doc, returns = _parse_doxygen(comment)
                     func = Function(
                         name=cm.group(2),
                         return_type=(cm.group(1) + " " if cm.group(1) else ""),
                         params=_parse_params(cm.group(3)),
                         file=file, line=lineno, is_method=True,
-                        comment=_last_comment(src_lines, lineno),
-                        kind=kind)
+                        comment=comment, kind=kind,
+                        brief=brief, params_doc=params_doc, returns=returns)
                     methods.append(func)
                     continue
                 om = _OPERATOR_RE.match(line)
                 if om:
+                    comment = _last_comment(src_lines, lineno)
+                    brief, params_doc, returns = _parse_doxygen(comment)
                     func = Function(
                         name=f"operator{om.group(2).strip()}",
                         return_type=om.group(1).strip(),
                         params=_parse_params(om.group(3)),
                         file=file, line=lineno, is_method=True,
-                        comment=_last_comment(src_lines, lineno),
-                        kind=kind)
+                        comment=comment, kind=kind,
+                        brief=brief, params_doc=params_doc, returns=returns)
                     methods.append(func)
                     continue
                 fm = _FIELD_RE.match(line)

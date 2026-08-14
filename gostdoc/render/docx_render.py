@@ -136,6 +136,10 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None,
                 doc.add_paragraph(
                     f"{kind}: {m.return_type} {m.name}({', '.join(m.params)})",
                     style="List Bullet")
+                if m.brief:
+                    p = doc.add_paragraph(m.brief, style="List Bullet 2")
+                    for run in p.runs:
+                        run.italic = True
 
     for fn in proj.functions:
         doc.add_paragraph(f"Функция {fn.name}").bold = True
@@ -172,6 +176,19 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None,
                 for run in lp.runs:
                     run.font.name = "Courier New"
                     run.font.size = _Pt(10)
+
+    from .bodies import REV_HEADERS, revision_rows
+    doc.add_page_break()
+    h = doc.add_paragraph()
+    h.add_run("Лист регистрации изменений").bold = True
+    table = doc.add_table(rows=1, cols=len(REV_HEADERS))
+    table.style = "Table Grid"
+    for j, htext in enumerate(REV_HEADERS):
+        table.rows[0].cells[j].text = htext
+    for row in revision_rows():
+        cells = table.add_row().cells
+        for j, val in enumerate(row):
+            cells[j].text = val
 
     doc.save(str(out_path))
     return out_path

@@ -79,8 +79,12 @@ def render_html(proj: Project, out_path: Path, diagrams: dict | None = None,
         for f_ in cls.fields:
             b.append(f'<tr><td>поле</td><td>{_esc(f_)}</td></tr>')
         for m in cls.methods:
-            b.append(f'<tr><td>метод</td><td>{_esc(m.return_type)} {_esc(m.name)}'
-                     f'({_esc(", ".join(m.params))})</td></tr>')
+            row = f'<tr><td>{_esc({"signal": "сигнал", "slot": "слот"}.get(m.kind, "метод"))}</td>' \
+                  f'<td>{_esc(m.return_type)} {_esc(m.name)}' \
+                  f'({_esc(", ".join(m.params))})</td></tr>'
+            b.append(row)
+            if m.brief:
+                b.append(f'<tr><td></td><td><i>{_esc(m.brief)}</i></td></tr>')
     b.append('</table>')
 
     if proj.functions:
@@ -110,6 +114,14 @@ def render_html(proj: Project, out_path: Path, diagrams: dict | None = None,
             for i, line in enumerate(code.splitlines(), start=1):
                 b.append(f'{i:>5} | {_esc(line)}')
             b.append('</pre>')
+
+    from .bodies import REV_HEADERS, revision_rows
+    b.append('<h3>Лист регистрации изменений</h3>')
+    b.append('<table border="1" cellspacing="0" cellpadding="4">')
+    b.append('<tr>' + "".join(f'<th>{_esc(h)}</th>' for h in REV_HEADERS) + '</tr>')
+    for row in revision_rows():
+        b.append('<tr>' + "".join(f'<td>{_esc(v)}</td>' for v in row) + '</tr>')
+    b.append('</table>')
 
     css = """
     body { font-family: "Times New Roman", serif; font-size: 14px;

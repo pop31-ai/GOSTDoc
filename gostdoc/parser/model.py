@@ -19,6 +19,9 @@ class Function:
     conditions: list[str] = field(default_factory=list)
     kind: str = "method"  # method / signal / slot
     connections: list[tuple[str, str, str, str]] = field(default_factory=list)
+    brief: str = ""  # Doxygen @brief
+    params_doc: dict[str, str] = field(default_factory=dict)  # @param
+    returns: str = ""  # @return
 
 
 @dataclass

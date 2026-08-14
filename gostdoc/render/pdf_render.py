@@ -161,5 +161,22 @@ def render_pdf(proj: Project, out_path: Path, diagrams: dict | None = None,
                                new_x="LMARGIN", new_y="NEXT")
             pdf.set_font("GOST", "", STYLE.font_size)
 
+    from .bodies import REV_HEADERS, revision_rows
+    pdf.add_page()
+    pdf.set_font("GOST", "B", STYLE.font_size)
+    pdf.multi_cell(0, lh, "Лист регистрации изменений", align="C",
+                   new_x="LMARGIN", new_y="NEXT")
+    avail = pdf.w - STYLE.margin_left_mm - STYLE.margin_right_mm
+    widths = [avail * s for s in (0.14, 0.20, 0.12, 0.18, 0.14, 0.10, 0.12)]
+    pdf.set_font("GOST", "", 8)
+    pdf.set_fill_color(235, 235, 235)
+    for j, htext in enumerate(REV_HEADERS):
+        pdf.cell(widths[j], 7, htext, border=1, align="C", fill=True)
+    pdf.ln()
+    for row in revision_rows():
+        for j, val in enumerate(row):
+            pdf.cell(widths[j], 7, val, border=1, align="C")
+        pdf.ln()
+
     pdf.output(str(out_path))
     return out_path
