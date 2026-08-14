@@ -31,6 +31,23 @@ class Class:
 
 
 @dataclass
+class Enum:
+    name: str
+    file: str = ""
+    line: int = 0
+    values: list[str] = field(default_factory=list)
+    comment: str = ""
+
+
+@dataclass
+class TypeDef:
+    name: str
+    aliased: str = ""
+    file: str = ""
+    line: int = 0
+
+
+@dataclass
 class Project:
     name: str
     author: str = ""
@@ -41,6 +58,9 @@ class Project:
     functions: list[Function] = field(default_factory=list)
     call_edges: list[tuple[str, str]] = field(default_factory=list)
     nn_results: list = field(default_factory=list)
+    enums: list[Enum] = field(default_factory=list)
+    typedefs: list[TypeDef] = field(default_factory=list)
+    namespaces: list[str] = field(default_factory=list)
 
     def all_functions(self) -> list[Function]:
         out = list(self.functions)

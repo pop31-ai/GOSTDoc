@@ -21,7 +21,7 @@ private:
 def test_parse_class():
     path = Path("examples/sample/mainwindow.h")
     assert path.exists(), "пример отсутствует"
-    classes = parse_file(path)
+    classes, _en, _td, _ns = parse_file(path)
     names = [c.name for c in classes]
     assert "MainWindow" in names
     assert "ImageProcessor" in names
@@ -31,7 +31,7 @@ def test_parse_class_fields_methods():
     tmp = Path("examples/sample/_tmp.h")
     tmp.write_text(SAMPLE, encoding="utf-8")
     try:
-        classes = parse_file(tmp)
+        classes, _en, _td, _ns = parse_file(tmp)
         cm = classes[0]
         assert cm.name == "CoffeeMachine"
         assert {m.name for m in cm.methods} == {"CoffeeMachine", "brew"}

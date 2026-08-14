@@ -9,15 +9,20 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .model import Class, Function, Project
+from .model import Class, Enum, Function, Project, TypeDef
 
 _CALL_RE = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
 _CLASS_RE = re.compile(r"^\s*(?:class|struct)\s+(\w+)\s*(?::\s*public\s+(\w+))?")
+_ENUM_RE = re.compile(r"^\s*enum(?:\s+class)?\s+(\w+)?\s*\{")
+_TYPEDEF_RE = re.compile(r"^\s*typedef\s+([\w:<>,&\*\s]+?)\s+(\w+)\s*;?\s*$")
+_USING_RE = re.compile(r"^\s*using\s+(\w+)\s*=\s*([\w:<>,&\*\s]+?)\s*;?\s*$")
+_NAMESPACE_RE = re.compile(r"^\s*namespace\s+(\w+)")
 _DECL_RE = re.compile(
     r"^\s*(?:(virtual|static|inline|explicit|const|friend)\s+)*"
     r"([\w:<>,&\*]+)\s+(\w+)\s*\(([^;{]*)\)\s*(?:const)?\s*(?:override)?\s*([;{])"
 )
 _CTOR_RE = re.compile(r"^\s*(?:(virtual|static|inline|explicit|friend)\s+)*(~?\w+)\s*\(([^;{}]*)\)\s*([;{])")
+_OPERATOR_RE = re.compile(r"^\s*(?:virtual\s+)?([\w:<>,&\*]+)\s+operator\s*(\S+)\s*\(([^;{}]*)\)\s*(?:const)?\s*(?:override)?\s*[;{]")
 _FIELD_RE = re.compile(r"^\s*([\w:<>,&\*]+)\s+(\w+)\s*(?:\[[^\]]*\])?\s*[;=]")
 _COMMENT_BLOCK_RE = re.compile(r"/\*(.*?)\*/", re.S)
 _COMMENT_LINE_RE = re.compile(r"//.*$", re.M)
@@ -90,14 +95,17 @@ def _balance_index(lines: list[str], start: int) -> int:
     """Индекс строки, закрывающей фигурную скобку, открытую на start."""
     depth = 0
     for j in range(start, len(lines)):
-        depth += lines[j].count("{") - lines[j].count("}")
-        if depth == 0 and j > start:
+        opens, closes = lines[j].count("{"), lines[j].count("}")
+        depth += opens - closes
+        if j > start and depth <= 0:
+            return j
+        if j == start and opens == closes and opens:
             return j
     return len(lines) - 1
 
 
-def parse_file(path: str | Path) -> list[Class]:
-    """Парсит один файл .cpp/.h/.hpp, возвращает классы."""
+def parse_file(path: str | Path) -> tuple[list[Class], list[Enum], list[TypeDef], list[str]]:
+    """Парсит один файл: классы, перечисления, typedef'ы, пространства имён."""
     path = Path(path)
     raw = path.read_text(encoding="utf-8", errors="ignore")
     src = _COMMENT_BLOCK_RE.sub("", raw)
@@ -105,6 +113,43 @@ def parse_file(path: str | Path) -> list[Class]:
     raw_lines = raw.splitlines()
 
     classes: list[Class] = []
+    enums: list[Enum] = []
+    typedefs: list[TypeDef] = []
+    namespaces: list[str] = []
+
+    # пространства имён
+    for k, line in enumerate(lines):
+        m = _NAMESPACE_RE.match(line)
+        if m and m.group(1) not in namespaces:
+            namespaces.append(m.group(1))
+
+    # typedef / using
+    for k, line in enumerate(lines):
+        m = _TYPEDEF_RE.match(line)
+        if m:
+            typedefs.append(TypeDef(name=m.group(2).strip(),
+                                   aliased=m.group(1).strip(), file=path.name, line=k + 1))
+            continue
+        m = _USING_RE.match(line)
+        if m:
+            typedefs.append(TypeDef(name=m.group(1).strip(),
+                                   aliased=m.group(2).strip(), file=path.name, line=k + 1))
+
+    # перечисления
+    for k, line in enumerate(lines):
+        m = _ENUM_RE.match(line)
+        if not m:
+            continue
+        body_end = _balance_index(lines, k)
+        if body_end == k:
+            inner = line[line.find("{") + 1:line.rfind("}")]
+        else:
+            inner = "\n".join(lines[k + 1:body_end])
+        values = [v.strip() for v in inner.split(",") if v.strip()]
+        enums.append(Enum(name=m.group(1) or "", file=path.name, line=k + 1,
+                          values=values, comment=_last_comment(raw_lines, k)))
+        i = body_end + 1
+
     i = 0
     while i < len(lines):
         m = _CLASS_RE.match(lines[i])
@@ -119,7 +164,7 @@ def parse_file(path: str | Path) -> list[Class]:
         cls.fields, cls.methods = _parse_class_body(body, path.name, lines, i + 1)
         classes.append(cls)
         i = body_end + 1
-    return classes
+    return classes, enums, typedefs, namespaces
 
 
 def _parse_class_body(body: str, file: str, src_lines: list[str],
@@ -175,6 +220,16 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                         comment=_last_comment(src_lines, lineno))
                     methods.append(func)
                     continue
+                om = _OPERATOR_RE.match(line)
+                if om:
+                    func = Function(
+                        name=f"operator{om.group(2).strip()}",
+                        return_type=om.group(1).strip(),
+                        params=_parse_params(om.group(3)),
+                        file=file, line=lineno, is_method=True,
+                        comment=_last_comment(src_lines, lineno))
+                    methods.append(func)
+                    continue
                 fm = _FIELD_RE.match(line)
                 if fm and "(" not in fm.group(1) and fm.group(2):
                     fields.append(f"{fm.group(1).strip()} {fm.group(2).strip()}")
@@ -195,7 +250,13 @@ def parse_project(src_dir: str | Path, name: str = "", author: str = "",
     files = sorted(p for p in src_dir.rglob("*") if p.suffix.lower() in suffixes)
     for path in files:
         proj.sources.append(str(path))
-        proj.classes.extend(parse_file(path))
+        classes, enums, typedefs, namespaces = parse_file(path)
+        proj.classes.extend(classes)
+        proj.enums.extend(enums)
+        proj.typedefs.extend(typedefs)
+        for ns in namespaces:
+            if ns not in proj.namespaces:
+                proj.namespaces.append(ns)
 
     # свободные функции и определения методов из cpp-файлов
     for path in files:

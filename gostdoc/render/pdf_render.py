@@ -103,6 +103,16 @@ def render_pdf(proj: Project, out_path: Path, diagrams: dict | None = None,
             pdf.ln(2)
             para(cap)
             pdf.add_page()
+    flows = (diagrams or {}).get("flows") or {}
+    for i, fname in enumerate(sorted(flows), start=3):
+        img = flows[fname]
+        try:
+            pdf.image(str(img), w=130)
+        except Exception:
+            continue
+        pdf.ln(2)
+        para(f"Рисунок А.{i} — Блок-схема функции {fname}", center=True)
+        pdf.add_page()
     for cls in proj.classes:
         para(f"Класс {cls.name}" + (f" : {cls.base}" if cls.base else ""), bold=True)
         if cls.comment:

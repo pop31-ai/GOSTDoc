@@ -109,6 +109,10 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None,
     if diagrams and diagrams.get("calls"):
         doc.add_picture(str(diagrams["calls"]), width=Cm(16))
         doc.add_paragraph("Рисунок А.2 — Граф вызовов")
+    flows = (diagrams or {}).get("flows") or {}
+    for i, fname in enumerate(sorted(flows), start=3):
+        doc.add_picture(str(flows[fname]), width=Cm(12))
+        doc.add_paragraph(f"Рисунок А.{i} — Блок-схема функции {fname}")
 
     for cls in proj.classes:
         doc.add_paragraph(f"Класс {cls.name}" + (f" : {cls.base}" if cls.base else "")).bold = True
