@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..parser.model import Project
-from ..styles.gost_styles import STYLE, GOST19_402_SECTIONS
+from ..styles.gost_styles import STYLE
+from ..styles.docs import get_doc
+from .bodies import body_for
 
 
 def _add_page_numbers(doc) -> None:
@@ -30,11 +32,13 @@ def _section_num(i: int) -> str:
     return f"{i}"
 
 
-def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None) -> Path:
+def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None,
+                doc_code: str = "19.402") -> Path:
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
     from docx.shared import Mm, Pt, Cm
 
+    doc_spec = get_doc(doc_code)
     doc = Document()
     sec = doc.sections[0]
     sec.page_width, sec.page_height = Mm(210), Mm(297)
@@ -64,33 +68,34 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None) -> 
     r = p.add_run(proj.name)
     r.font.size = Pt(18)
     r.bold = True
-    doc.add_paragraph("ПРОГРАММА")
-    doc.add_paragraph("Руководство программиста. Описание программы")
+    doc.add_paragraph(doc_spec.title)
+    doc.add_paragraph(doc_spec.subtitle)
     for _ in range(5):
         doc.add_paragraph("")
     doc.add_paragraph(f"Разработал: {proj.author or '________'}")
     doc.add_paragraph(f"Дата: {__import__('datetime').date.today().isoformat()}")
+    doc.add_paragraph(f"Документ: ГОСТ {doc_spec.code} (ЕСПД)")
     doc.add_page_break()
 
     # --- аннотация ---
     h = doc.add_paragraph()
     h.add_run("Аннотация").bold = True
     doc.add_paragraph(
-        f"Настоящий документ содержит описание программы «{proj.name}» "
-        f"и соответствует требованиям ГОСТ 19.402, ГОСТ 2.105. "
+        f"Настоящий документ — «{doc_spec.subtitle}» для программы «{proj.name}»; "
+        f"соответствует требованиям ЕСПД (ГОСТ 19) и ГОСТ 2.105. "
         f"{proj.comment}".strip())
 
     # --- содержание (краткое) ---
     h = doc.add_paragraph()
     h.add_run("Содержание").bold = True
-    for num, (title, _key) in enumerate(GOST19_402_SECTIONS, start=1):
+    for num, title, _key in doc_spec.sections:
         doc.add_paragraph(f"{num}. {title}")
 
     # --- разделы ---
-    for num, (title, key) in enumerate(GOST19_402_SECTIONS, start=1):
+    for num, title, key in doc_spec.sections:
         h = doc.add_paragraph()
         h.add_run(f"{num}. {title}").bold = True
-        doc.add_paragraph(_body_for(proj, key, diagrams))
+        doc.add_paragraph(body_for(proj, key))
 
     doc.add_page_break()
 
@@ -137,9 +142,9 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None) -> 
             p.add_run(f"{r.net_name} [score={r.score}]").bold = True
             doc.add_paragraph(r.text, style="List Bullet")
 
-    if proj.sources:
+    if doc_code == "19.401" and proj.sources:
         h = doc.add_paragraph()
-        h.add_run("Приложение В. Текст программы (ГОСТ 19.401)").bold = True
+        h.add_run("Приложение В. Текст программы").bold = True
         from docx.shared import Pt as _Pt
         for src in proj.sources:
             p = doc.add_paragraph()
@@ -158,24 +163,3 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None) -> 
 
     doc.save(str(out_path))
     return out_path
-
-
-def _body_for(proj: Project, key: str, diagrams: dict | None) -> str:
-    if key == "opurpose":
-        return f"Программа «{proj.name}» предназначена для обработки данных согласно техническому заданию."
-    if key == "desc":
-        parts = [f"Программа содержит {len(proj.classes)} классов и {len(proj.functions)} свободных функций."]
-        for cls in proj.classes:
-            parts.append(f"Класс {cls.name} — {len(cls.methods)} методов, {len(cls.fields)} полей.")
-        return " ".join(parts)
-    if key == "logic":
-        return "Логическая структура отражена на схемах в приложении А."
-    if key == "call":
-        return "Запуск программы осуществляется из командной строки или среды разработки."
-    if key == "input":
-        return "Входные данные: исходные файлы проекта, параметры командной строки."
-    if key == "output":
-        return "Выходные данные: документация в форматах PDF, DOCX, TXT."
-    if key == "tech":
-        return "Требования: C++/Qt, ОС Windows/Linux."
-    return ""

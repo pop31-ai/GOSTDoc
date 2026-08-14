@@ -81,3 +81,27 @@ def test_conditions_extracted():
     assert any("if x > 0" in c for c in conds)
     assert any("while y" in c for c in conds)
     assert any("for" in c for c in conds)
+
+
+def test_doctype_single(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("txt",), name="D", doctype="19.404")
+    assert len(results) == 1
+    assert "Пояснительная записка" in results[0].read_text(encoding="utf-8")
+
+
+def test_doctype_all(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("txt",), name="D", doctype="all")
+    codes = {p.stem.split("_")[0] for p in results}
+    assert codes == {"19.401", "19.402", "19.403", "19.404", "19.505"}
+
+
+def test_docs_all_codes_render_pdf(tmp_path: Path):
+    from gostdoc.render.pdf_render import render_pdf
+    from gostdoc.styles.docs import ALL_CODES
+    from gostdoc.parser.cpp_parser import parse_project
+    proj = parse_project(Path("examples/sample"))
+    for code in ALL_CODES:
+        out = render_pdf(proj, tmp_path / f"{code}.pdf", doc_code=code)
+        assert out.exists() and out.stat().st_size > 0

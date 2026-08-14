@@ -10,16 +10,17 @@ from pathlib import Path
 from . import __version__
 from .grapher.graphs import call_graph, class_diagram, flowcharts
 from .parser.cpp_parser import parse_project
+from .styles.docs import ALL_CODES
 
 _CONFIG_NAME = ".gostdoc.json"
 _KEYS = ("project", "out", "format", "name", "author", "organisation",
-         "comment", "nn")
+         "comment", "nn", "doctype")
 
 
 def build_docs(project: str, out: str, fmt: tuple[str, ...],
                name: str = "", author: str = "",
                organisation: str = "", comment: str = "",
-               nn: bool = False) -> list[Path]:
+               nn: bool = False, doctype: str = "19.402") -> list[Path]:
     src = Path(project)
     out_dir = Path(out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -32,6 +33,12 @@ def build_docs(project: str, out: str, fmt: tuple[str, ...],
         proj.nn_results = run_all(proj)
         print_report(proj.nn_results)
 
+    if doctype == "all":
+        codes = list(ALL_CODES)
+    else:
+        codes = [doctype]
+
+    import tempfile
     with tempfile.TemporaryDirectory() as td:
         tdir = Path(td)
         diagrams = {
@@ -39,19 +46,22 @@ def build_docs(project: str, out: str, fmt: tuple[str, ...],
             "calls": call_graph(proj, tdir),
             "flows": flowcharts(proj, tdir),
         }
+
         results: list[Path] = []
-        for f in fmt:
-            if f == "docx":
-                from .render.docx_render import render_docx
-                results.append(render_docx(proj, out_dir / f"{proj.name}.docx", diagrams))
-            elif f == "pdf":
-                from .render.pdf_render import render_pdf
-                results.append(render_pdf(proj, out_dir / f"{proj.name}.pdf", diagrams))
-            elif f == "txt":
-                from .render.txt_render import render_txt
-                results.append(render_txt(proj, out_dir / f"{proj.name}.txt"))
-            elif f == "json":
-                results.append(_render_json(proj, out_dir / f"{proj.name}.json"))
+        for code in codes:
+            prefix = f"{code}_" if len(codes) > 1 else ""
+            for f in fmt:
+                if f == "docx":
+                    from .render.docx_render import render_docx
+                    results.append(render_docx(proj, out_dir / f"{prefix}{proj.name}.docx", diagrams, code))
+                elif f == "pdf":
+                    from .render.pdf_render import render_pdf
+                    results.append(render_pdf(proj, out_dir / f"{prefix}{proj.name}.pdf", diagrams, code))
+                elif f == "txt":
+                    from .render.txt_render import render_txt
+                    results.append(render_txt(proj, out_dir / f"{prefix}{proj.name}.txt", code))
+                elif f == "json":
+                    results.append(_render_json(proj, out_dir / f"{prefix}{proj.name}.json"))
     return results
 
 
@@ -83,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--comment", default="", help="аннотация к программе")
     parser.add_argument("--nn", action="store_true",
                         help="запустить 23 нейросети для анализа и вывод в документ")
+    parser.add_argument("--doctype", default="19.402",
+                        help="тип документа: 19.401, 19.402, 19.403, 19.404, 19.505 или all")
     parser.add_argument("--config", "-c", default="",
                         help="файл конфигурации (.gostdoc.json)")
     args = parser.parse_args(argv)
@@ -101,13 +113,15 @@ def main(argv: list[str] | None = None) -> int:
     resolved = {k: getattr(args, k) for k in _KEYS}
     resolved.update({k: v for k, v in cfg.items() if v not in (None, "")})
     resolved["nn"] = bool(resolved.get("nn"))
+    resolved["doctype"] = resolved.get("doctype") or "19.402"
     resolved["format"] = tuple(x.strip().lower() for x in resolved["format"].split(",")
                                if x.strip())
     try:
         results = build_docs(resolved["project"], resolved["out"], resolved["format"],
                              name=resolved["name"], author=resolved["author"],
                              organisation=resolved["organisation"],
-                             comment=resolved["comment"], nn=resolved["nn"])
+                             comment=resolved["comment"], nn=resolved["nn"],
+                             doctype=resolved["doctype"])
     except Exception as e:  # noqa: BLE001
         parser.error(f"ошибка: {e}")
 
