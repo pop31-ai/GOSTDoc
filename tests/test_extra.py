@@ -94,7 +94,8 @@ def test_doctype_all(tmp_path: Path):
     results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
                          ("txt",), name="D", doctype="all")
     codes = {p.stem.split("_")[0] for p in results}
-    assert codes == {"19.401", "19.402", "19.403", "19.404", "19.504", "19.505"}
+    assert codes == {"19.301", "19.401", "19.402", "19.403", "19.404",
+                     "19.504", "19.505"}
 
 
 def test_docs_all_codes_render_pdf(tmp_path: Path):
@@ -295,3 +296,41 @@ def test_glossary_19_404(tmp_path: Path):
     text = results[0].read_text(encoding="utf-8")
     assert "Термины и сокращения" in text
     assert "MainWindow" in text
+
+
+def test_doc_19301(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("txt",), name="T", doctype="19.301")
+    text = results[0].read_text(encoding="utf-8")
+    assert "Программа и методика испытаний" in text
+    assert "Тестовые примеры" in text
+
+
+def test_render_md(tmp_path: Path):
+    from gostdoc.render.md_render import render_md
+    from gostdoc.parser.cpp_parser import parse_project
+    from gostdoc.grapher.graphs import class_diagram, call_graph
+    proj = parse_project(Path("examples/sample"))
+    diag = {"classes": class_diagram(proj, tmp_path),
+            "calls": call_graph(proj, tmp_path)}
+    out = render_md(proj, tmp_path / "doc.md", diag)
+    text = out.read_text(encoding="utf-8")
+    assert "# SampleApp" in text
+    assert "Приложение А" in text
+    assert "Классы" in text
+    assert (tmp_path / "figures" / "classes.png").exists()
+
+
+def test_build_docs_md(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "o"),
+                         ("md",), name="M")
+    assert results[0].suffix == ".md"
+
+
+def test_cli_init(tmp_path: Path, monkeypatch):
+    import sys
+    from gostdoc.cli import main
+    monkeypatch.chdir(tmp_path)
+    assert main(["--init"]) == 0
+    cfg = (tmp_path / ".gostdoc.json").read_text(encoding="utf-8")
+    assert "project" in cfg

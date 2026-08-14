@@ -66,6 +66,9 @@ def build_docs(project: str, out: str, fmt: tuple[str, ...],
                 elif f == "html":
                     from .render.html_render import render_html
                     results.append(render_html(proj, out_dir / f"{prefix}{proj.name}.html", diagrams, code))
+                elif f == "md":
+                    from .render.md_render import render_md
+                    results.append(render_md(proj, out_dir / f"{prefix}{proj.name}.md", diagrams, code))
                 elif f == "json":
                     results.append(_render_json(proj, out_dir / f"{prefix}{proj.name}.json"))
 
@@ -91,6 +94,28 @@ def _render_json(proj: Project, out_path: Path) -> Path:
     return out_path
 
 
+def _write_config_template() -> None:
+    cfg_path = Path(_CONFIG_NAME)
+    if cfg_path.exists():
+        print(f"конфигурация уже существует: {cfg_path}")
+        return
+    template = {
+        "project": "./src",
+        "out": "./docs",
+        "format": "pdf,docx,txt",
+        "name": "",
+        "author": "",
+        "organisation": "",
+        "comment": "",
+        "nn": False,
+        "doctype": "19.402",
+        "zip": False,
+    }
+    cfg_path.write_text(
+        json.dumps(template, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"создано: {cfg_path}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="gostdoc",
@@ -99,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project", "-p", default=".", help="каталог с исходниками C++")
     parser.add_argument("--out", "-o", default="./docs", help="каталог для документации")
     parser.add_argument("--format", "-f", default="pdf,docx,txt",
-                        help="форматы: pdf,docx,txt,html,json через запятую")
+                        help="форматы: pdf,docx,txt,html,md,json через запятую")
     parser.add_argument("--name", default="", help="название программы")
     parser.add_argument("--author", default="", help="разработчик")
     parser.add_argument("--organisation", default="", help="организация")
@@ -112,7 +137,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="файл конфигурации (.gostdoc.json)")
     parser.add_argument("--zip", action="store_true",
                         help="упаковать все сгенерированные документы в ZIP")
+    parser.add_argument("--init", action="store_true",
+                        help="создать шаблон конфигурации .gostdoc.json в текущем каталоге")
     args = parser.parse_args(argv)
+
+    if args.init:
+        _write_config_template()
+        return 0
 
     # конфигурация: файл -> аргументы (файл имеет приоритет над дефолтами)
     cfg: dict = {}
@@ -125,8 +156,16 @@ def main(argv: list[str] | None = None) -> int:
                 break
             except (UnicodeDecodeError, json.JSONDecodeError):
                 continue
-    resolved = {k: getattr(args, k) for k in _KEYS}
-    resolved.update({k: v for k, v in cfg.items() if v not in (None, "")})
+    # приоритет: явные аргументы CLI > конфигурация > дефолты
+    dflt = {k: parser.get_default(k) for k in _KEYS}
+    resolved: dict = {}
+    for k in _KEYS:
+        arg_v = getattr(args, k)
+        if arg_v != dflt.get(k):
+            resolved[k] = arg_v
+        else:
+            cfg_v = cfg.get(k)
+            resolved[k] = cfg_v if cfg_v not in (None, "") else arg_v
     resolved["nn"] = bool(resolved.get("nn"))
     resolved["zip"] = bool(resolved.get("zip"))
     resolved["doctype"] = resolved.get("doctype") or "19.402"
