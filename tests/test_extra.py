@@ -147,3 +147,63 @@ def test_build_docs_html(tmp_path: Path):
     results = build_docs(str(Path("examples/sample")), str(tmp_path / "o"),
                          ("html",), name="H")
     assert results[0].suffix == ".html"
+
+
+QT_SRC = """
+class Widget : public QWidget {
+    Q_OBJECT
+public:
+    Widget();
+    void start();
+signals:
+    void finished(int code);
+public slots:
+    void handleDone(int code);
+};
+"""
+
+
+def test_qt_signals_slots(tmp_path: Path):
+    f = tmp_path / "w.h"
+    f.write_text(QT_SRC, encoding="utf-8")
+    classes, _en, _td, _ns = parse_file(f)
+    w = classes[0]
+    kinds = {m.name: m.kind for m in w.methods}
+    assert kinds.get("finished") == "signal"
+    assert kinds.get("handleDone") == "slot"
+    assert kinds.get("start") == "method"
+
+
+def test_connect_extraction(tmp_path: Path):
+    f = tmp_path / "w.cpp"
+    f.write_text(
+        "void Widget::start() {\n"
+        "    connect(btn, &QPushButton::clicked, this, &Widget::handleDone);\n"
+        "    connect(this, SIGNAL(finished(int)), app, SLOT(quit()));\n"
+        "}", encoding="utf-8")
+    from gostdoc.parser.cpp_parser import _extract_connections
+    conns = _extract_connections(f.read_text(encoding="utf-8"))
+    pairs = {(s, r, sig, slot) for s, r, sig, slot in conns}
+    assert ("btn", "this", "clicked", "handleDone") in pairs
+    assert ("this", "app", "finished", "quit") in pairs
+
+
+def test_sequence_diagram(tmp_path: Path):
+    from gostdoc.grapher.graphs import sequence_diagrams
+    from gostdoc.parser.cpp_parser import parse_project
+    proj = parse_project(Path("examples/sample"))
+    seqs = sequence_diagrams(proj, tmp_path)
+    assert "main" in seqs
+    p = Path(seqs["main"])
+    assert p.exists() and p.stat().st_size > 0
+
+
+def test_build_docs_zip(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("txt",), name="Z", zip_out=True)
+    zip_path = next(r for r in results if r.suffix == ".zip")
+    assert zip_path.exists()
+    import zipfile
+    with zipfile.ZipFile(zip_path) as zf:
+        names = zf.namelist()
+    assert any(n.endswith(".txt") for n in names)

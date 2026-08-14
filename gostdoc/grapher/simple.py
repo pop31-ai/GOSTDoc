@@ -202,3 +202,59 @@ def flowcharts(proj: Project, out_dir: Path) -> dict[str, str]:
         if f.calls or f.conditions:
             out[f.name] = flowchart(f.name, f.calls, f.conditions, out_dir)
     return out
+
+
+def sequence_diagram(proj: Project, entry: str, out_dir: Path) -> str | None:
+    """Диаграмма последовательности: цепочка вызовов от точки входа."""
+    by_name = {f.name: f for f in proj.all_functions()}
+    if entry not in by_name:
+        entry = "main" if "main" in by_name else next(iter(by_name), None)
+    if not entry:
+        return None
+    font = _font(10)
+    chain: list[str] = [entry]
+    seen = {entry}
+    cur = entry
+    while cur in by_name and by_name[cur].calls:
+        nxt = next((c for c in by_name[cur].calls if c in by_name and c not in seen), None)
+        if not nxt:
+            break
+        chain.append(nxt)
+        seen.add(nxt)
+        cur = nxt
+
+    pad, box_h, gap = 16, 40, 60
+    maxw = max(_text_size(ImageDraw.Draw(Image.new("RGB", (1, 1))), n, font)[0]
+               for n in chain)
+    w = max(420, maxw + pad + 40)
+    h = len(chain) * (box_h + gap) + 80
+    img = Image.new("RGB", (w, h), _BG)
+    draw = ImageDraw.Draw(img)
+
+    x = w // 2
+    prev_y = None
+    for i, name in enumerate(chain):
+        lines = _text_wrap(name, font, maxw)
+        box_w = max(maxw, 100) + 16
+        bx = x - box_w // 2
+        by = 40 + i * (box_h + gap)
+        _draw_box(draw, bx, by, box_w, box_h, lines, font)
+        if prev_y is not None:
+            _arrow(draw, x, prev_y, x, by)
+        prev_y = by + box_h
+        if i < len(chain) - 1:
+            draw.text((bx + box_w + 8, by + box_h // 2 - 8), "вызов()",
+                      font=font, fill=(90, 90, 90))
+    out = out_dir / f"seq_{entry}"
+    img.save(str(out) + ".png")
+    return str(out) + ".png"
+
+
+def sequence_diagrams(proj: Project, out_dir: Path) -> dict[str, str]:
+    entries = ["main"] + [f.name for f in proj.functions]
+    out: dict[str, str] = {}
+    for e in dict.fromkeys(entries):
+        p = sequence_diagram(proj, e, out_dir)
+        if p:
+            out[e] = p
+    return out

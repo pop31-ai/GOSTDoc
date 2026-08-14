@@ -58,11 +58,19 @@ def render_html(proj: Project, out_path: Path, diagrams: dict | None = None,
             b.append(f'<img src="data:image/png;base64,{data}" alt="{cap}"><p class="fig">{cap}</p>')
             fig += 1
     flows = (diagrams or {}).get("flows") or {}
-    for i, fname in enumerate(sorted(flows), start=fig):
+    for fname in sorted(flows):
         data = _img_b64(flows[fname])
         if data:
-            cap = f'Рисунок А.{i} — Блок-схема функции {_esc(fname)}'
+            cap = f'Рисунок А.{fig} — Блок-схема функции {_esc(fname)}'
             b.append(f'<img src="data:image/png;base64,{data}" alt="{cap}"><p class="fig">{cap}</p>')
+            fig += 1
+    seqs = (diagrams or {}).get("seq") or {}
+    for entry in sorted(seqs):
+        data = _img_b64(seqs[entry])
+        if data:
+            cap = f'Рисунок А.{fig} — Диаграмма последовательности (вход: {_esc(entry)})'
+            b.append(f'<img src="data:image/png;base64,{data}" alt="{cap}"><p class="fig">{cap}</p>')
+            fig += 1
 
     b.append('<h4>Классы</h4><table border="1" cellspacing="0" cellpadding="4">')
     for cls in proj.classes:

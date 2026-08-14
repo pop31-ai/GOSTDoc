@@ -27,7 +27,10 @@ _FIELD_RE = re.compile(r"^\s*([\w:<>,&\*]+)\s+(\w+)\s*(?:\[[^\]]*\])?\s*[;=]")
 _COMMENT_BLOCK_RE = re.compile(r"/\*(.*?)\*/", re.S)
 _COMMENT_LINE_RE = re.compile(r"//.*$", re.M)
 _LITERALS_RE = re.compile(r'"(?:[^"\\]|\\.)*"|\'(?:[^\\\']|\\.)*\'')
-_ACCESS_RE = re.compile(r"\b(public|private|protected)\s*:")
+_ACCESS_RE = re.compile(r"\b(public|private|protected|signals|slots|Q_SIGNALS|Q_SLOTS)\s*:")
+_CONNECT_RE = re.compile(
+    r"connect\s*\(\s*([\w]+)[^,]*,\s*(?:SIGNAL\s*\(\s*([\w]+)|\&[\w]+::([\w]+))\s*\)?[^,]*,\s*([\w]+)[^,]*,\s*(?:SLOT\s*\(\s*([\w]+)|\&[\w]+::([\w]+))\s*\)?")
+_CONNECT_Q5_RE = re.compile(r"connect\s*\(\s*([\w]+)\s*,\s*\&([\w:]+)::([\w]+)\s*,\s*([\w]+)\s*,\s*\&([\w:]+)::([\w]+)\s*\)")
 
 _KEYWORDS = {"if", "for", "while", "switch", "catch", "return", "sizeof", "new",
              "delete", "static_cast", "const_cast", "dynamic_cast",
@@ -66,6 +69,26 @@ def _extract_conditions(block: str) -> list[str]:
         text = f"{m.group(1)} {m.group(2)}".strip()
         if text not in out:
             out.append(text)
+    return out
+
+
+def _extract_connections(block: str) -> list[tuple[str, str, str, str]]:
+    """Пары (отправитель, получатель, сигнал, слот) из connect() в теле."""
+    body = _COMMENT_LINE_RE.sub("", block)
+    body = _strip_literals(body)
+    out: list[tuple[str, str, str, str]] = []
+    for m in _CONNECT_RE.finditer(body):
+        sender, recv = m.group(1), m.group(4)
+        sig = m.group(2) or m.group(3)
+        slot = m.group(5) or m.group(6)
+        if sender and recv and sig and slot:
+            pair = (sender, recv, sig, slot)
+            if pair not in out:
+                out.append(pair)
+    for m in _CONNECT_Q5_RE.finditer(body):
+        pair = (m.group(1), m.group(4), m.group(3), m.group(6))
+        if pair not in out:
+            out.append(pair)
     return out
 
 
@@ -173,14 +196,10 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
     methods: list[Function] = []
 
     # разбиваем по модификаторам доступа, считая offset строки
-    pos = 0
-    line_offset = 0
-    for m in _ACCESS_RE.finditer(body):
-        pass
     chunks = _ACCESS_RE.split(body)
     chunk_lines = [c.count("\n") for c in chunks]
     running = 0
-    access = "private"
+    kind = "method"
     for idx, chunk in enumerate(chunks):
         if idx % 2 == 0:
             body_lines = chunk.splitlines()
@@ -193,7 +212,8 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                         return_type=(mm.group(1) + " " if mm.group(1) else "") + mm.group(2).strip(),
                         params=_parse_params(mm.group(4)),
                         file=file, line=lineno, is_method=True,
-                        comment=_last_comment(src_lines, lineno))
+                        comment=_last_comment(src_lines, lineno),
+                        kind=kind)
                     if mm.group(5) == "{":
                         body_start = body_lines.index(line, k)
                         # считаем конец тела
@@ -208,6 +228,7 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                         body_txt = "\n".join(bl[k + 1:j])
                         func.calls = _extract_call_names(body_txt)
                         func.conditions = _extract_conditions(body_txt)
+                        func.connections = _extract_connections(body_txt)
                     methods.append(func)
                     continue
                 cm = _CTOR_RE.match(line)
@@ -217,7 +238,8 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                         return_type=(cm.group(1) + " " if cm.group(1) else ""),
                         params=_parse_params(cm.group(3)),
                         file=file, line=lineno, is_method=True,
-                        comment=_last_comment(src_lines, lineno))
+                        comment=_last_comment(src_lines, lineno),
+                        kind=kind)
                     methods.append(func)
                     continue
                 om = _OPERATOR_RE.match(line)
@@ -227,14 +249,21 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                         return_type=om.group(1).strip(),
                         params=_parse_params(om.group(3)),
                         file=file, line=lineno, is_method=True,
-                        comment=_last_comment(src_lines, lineno))
+                        comment=_last_comment(src_lines, lineno),
+                        kind=kind)
                     methods.append(func)
                     continue
                 fm = _FIELD_RE.match(line)
                 if fm and "(" not in fm.group(1) and fm.group(2):
                     fields.append(f"{fm.group(1).strip()} {fm.group(2).strip()}")
         else:
-            access = chunk.strip()
+            label = chunk.strip()
+            if "signals" in label or "Q_SIGNALS" in label:
+                kind = "signal"
+            elif "slots" in label or "Q_SLOTS" in label:
+                kind = "slot"
+            else:
+                kind = "method"
         if idx < len(chunk_lines):
             running += chunk_lines[idx]
     return fields, methods
@@ -274,6 +303,7 @@ def parse_project(src_dir: str | Path, name: str = "", author: str = "",
                         if f.name == fname:
                             f.calls = calls
                             f.conditions = _extract_conditions(m.group(5))
+                            f.connections = _extract_connections(m.group(5))
                             f.file = path.name
         for m in re.finditer(
                 r"^([\w:<>,&\*]+)\s+(\w+)\s*\(([^;{}]*)\)\s*(?:const)?\s*\{(.*?)\n\}",
@@ -285,7 +315,8 @@ def parse_project(src_dir: str | Path, name: str = "", author: str = "",
                 name=fname, return_type=m.group(1).strip(),
                 params=_parse_params(m.group(3)), file=path.name,
                 is_method=False, calls=_extract_call_names(m.group(4)),
-                conditions=_extract_conditions(m.group(4))))
+                conditions=_extract_conditions(m.group(4)),
+                connections=_extract_connections(m.group(4))))
 
     # собираем граф вызовов
     known = {f.name for f in proj.all_functions()}

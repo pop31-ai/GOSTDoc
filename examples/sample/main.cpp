@@ -21,6 +21,8 @@ void MainWindow::processImage() {
     image = p.grayscale(image);
     image = p.resize(image, 800, 600);
     update();
+    connect(this, &MainWindow::imageProcessed, this, &MainWindow::updateStatus);
+    emit imageProcessed(currentFile);
 }
 
 int main(int argc, char* argv[]) {

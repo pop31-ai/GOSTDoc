@@ -5,22 +5,25 @@ from __future__ import annotations
 import argparse
 import json
 import tempfile
+import zipfile
 from pathlib import Path
 
 from . import __version__
-from .grapher.graphs import call_graph, class_diagram, flowcharts
+from .grapher.graphs import call_graph, class_diagram, flowcharts, sequence_diagrams
 from .parser.cpp_parser import parse_project
+from .parser.model import Project
 from .styles.docs import ALL_CODES
 
 _CONFIG_NAME = ".gostdoc.json"
 _KEYS = ("project", "out", "format", "name", "author", "organisation",
-         "comment", "nn", "doctype")
+         "comment", "nn", "doctype", "zip")
 
 
 def build_docs(project: str, out: str, fmt: tuple[str, ...],
                name: str = "", author: str = "",
                organisation: str = "", comment: str = "",
-               nn: bool = False, doctype: str = "19.402") -> list[Path]:
+               nn: bool = False, doctype: str = "19.402",
+               zip_out: bool = False) -> list[Path]:
     src = Path(project)
     out_dir = Path(out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -38,13 +41,13 @@ def build_docs(project: str, out: str, fmt: tuple[str, ...],
     else:
         codes = [doctype]
 
-    import tempfile
     with tempfile.TemporaryDirectory() as td:
         tdir = Path(td)
         diagrams = {
             "classes": class_diagram(proj, tdir),
             "calls": call_graph(proj, tdir),
             "flows": flowcharts(proj, tdir),
+            "seq": sequence_diagrams(proj, tdir),
         }
 
         results: list[Path] = []
@@ -65,6 +68,13 @@ def build_docs(project: str, out: str, fmt: tuple[str, ...],
                     results.append(render_html(proj, out_dir / f"{prefix}{proj.name}.html", diagrams, code))
                 elif f == "json":
                     results.append(_render_json(proj, out_dir / f"{prefix}{proj.name}.json"))
+
+    if zip_out and results:
+        zip_path = out_dir / f"{proj.name}_docs.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for r in results:
+                zf.write(r, r.name)
+        results.append(zip_path)
     return results
 
 
@@ -100,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="тип документа: 19.401, 19.402, 19.403, 19.404, 19.505 или all")
     parser.add_argument("--config", "-c", default="",
                         help="файл конфигурации (.gostdoc.json)")
+    parser.add_argument("--zip", action="store_true",
+                        help="упаковать все сгенерированные документы в ZIP")
     args = parser.parse_args(argv)
 
     # конфигурация: файл -> аргументы (файл имеет приоритет над дефолтами)
@@ -116,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
     resolved = {k: getattr(args, k) for k in _KEYS}
     resolved.update({k: v for k, v in cfg.items() if v not in (None, "")})
     resolved["nn"] = bool(resolved.get("nn"))
+    resolved["zip"] = bool(resolved.get("zip"))
     resolved["doctype"] = resolved.get("doctype") or "19.402"
     resolved["format"] = tuple(x.strip().lower() for x in resolved["format"].split(",")
                                if x.strip())
@@ -124,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
                              name=resolved["name"], author=resolved["author"],
                              organisation=resolved["organisation"],
                              comment=resolved["comment"], nn=resolved["nn"],
-                             doctype=resolved["doctype"])
+                             doctype=resolved["doctype"], zip_out=resolved["zip"])
     except Exception as e:  # noqa: BLE001
         parser.error(f"ошибка: {e}")
 

@@ -17,6 +17,8 @@ class Function:
     comment: str = ""
     calls: list[str] = field(default_factory=list)
     conditions: list[str] = field(default_factory=list)
+    kind: str = "method"  # method / signal / slot
+    connections: list[tuple[str, str, str, str]] = field(default_factory=list)
 
 
 @dataclass

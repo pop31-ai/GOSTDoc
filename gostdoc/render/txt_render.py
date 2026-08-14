@@ -52,14 +52,19 @@ def render_txt(proj: Project, out_path: Path, doc_code: str = "19.402") -> Path:
         for f_ in cls.fields:
             lines.append(f"  - поле: {f_}")
         for m in cls.methods:
-            lines.append(f"  - метод: {m.return_type} {m.name}({', '.join(m.params)})")
+            kind = {"signal": "сигнал", "slot": "слот"}.get(m.kind, "метод")
+            lines.append(f"  - {kind}: {m.return_type} {m.name}({', '.join(m.params)})")
             for c in m.calls:
                 lines.append(f"        -> {c}()")
+            for s, r, sig, slot in m.connections:
+                lines.append(f"        connect({s}, {sig}() -> {r}, {slot}())")
     for fn in proj.functions:
         lines.append(f"\nФункция {fn.name}  [{fn.file}:{fn.line}]")
         lines.append(f"  {fn.return_type} {fn.name}({', '.join(fn.params)})")
         for c in fn.calls:
             lines.append(f"        -> {c}()")
+        for s, r, sig, slot in fn.connections:
+            lines.append(f"        connect({s}, {sig}() -> {r}, {slot}())")
 
     if proj.nn_results:
         lines.append("")

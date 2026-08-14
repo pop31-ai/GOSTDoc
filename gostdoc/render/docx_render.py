@@ -110,9 +110,16 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None,
         doc.add_picture(str(diagrams["calls"]), width=Cm(16))
         doc.add_paragraph("Рисунок А.2 — Граф вызовов")
     flows = (diagrams or {}).get("flows") or {}
-    for i, fname in enumerate(sorted(flows), start=3):
+    fig = 3
+    for fname in sorted(flows):
         doc.add_picture(str(flows[fname]), width=Cm(12))
-        doc.add_paragraph(f"Рисунок А.{i} — Блок-схема функции {fname}")
+        doc.add_paragraph(f"Рисунок А.{fig} — Блок-схема функции {fname}")
+        fig += 1
+    seqs = (diagrams or {}).get("seq") or {}
+    for entry in sorted(seqs):
+        doc.add_picture(str(seqs[entry]), width=Cm(15))
+        doc.add_paragraph(f"Рисунок А.{fig} — Диаграмма последовательности (вход: {entry})")
+        fig += 1
 
     for cls in proj.classes:
         doc.add_paragraph(f"Класс {cls.name}" + (f" : {cls.base}" if cls.base else "")).bold = True
@@ -125,8 +132,9 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None,
         if cls.methods:
             doc.add_paragraph("Методы:")
             for m in cls.methods:
+                kind = {"signal": "сигнал", "slot": "слот"}.get(m.kind, "метод")
                 doc.add_paragraph(
-                    f"{m.return_type} {m.name}({', '.join(m.params)})",
+                    f"{kind}: {m.return_type} {m.name}({', '.join(m.params)})",
                     style="List Bullet")
 
     for fn in proj.functions:

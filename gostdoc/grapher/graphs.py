@@ -36,7 +36,8 @@ def _fallback(out_dir: Path):
     from .simple import class_diagram as cd
     from .simple import call_graph as cg
     from .simple import flowcharts as fc
-    return cd, cg, fc
+    from .simple import sequence_diagrams as sq
+    return cd, cg, fc, sq
 
 
 def _gost_node_style():
@@ -48,7 +49,7 @@ def class_diagram(proj: Project, out_dir: Path) -> str | None:
     if graphviz is not None and _dot_available():
         return _class_diagram_dot(proj, out_dir)
     if _simple():
-        cd, _cg, _fc = _fallback(out_dir)
+        cd, _cg, _fc, _sq = _fallback(out_dir)
         return cd(proj, out_dir)
     return None
 
@@ -81,7 +82,7 @@ def call_graph(proj: Project, out_dir: Path) -> str | None:
     if graphviz is not None and _dot_available():
         return _call_graph_dot(proj, out_dir)
     if _simple():
-        _cd, cg, _fc = _fallback(out_dir)
+        _cd, cg, _fc, _sq = _fallback(out_dir)
         return cg(proj, out_dir)
     return None
 
@@ -106,9 +107,17 @@ def flowcharts(proj: Project, out_dir: Path) -> dict[str, str]:
     if graphviz is not None and _dot_available():
         return _flowcharts_dot(proj, out_dir)
     if _simple():
-        _cd, _cg, fc = _fallback(out_dir)
+        _cd, _cg, fc, _sq = _fallback(out_dir)
         return fc(proj, out_dir)
     return {}
+
+
+def sequence_diagrams(proj: Project, out_dir: Path) -> dict[str, str]:
+    """Диаграммы последовательности вызовов от точек входа (Pillow)."""
+    if not _simple():
+        return {}
+    _cd, _cg, _fc, sq = _fallback(out_dir)
+    return sq(proj, out_dir)
 
 
 def _flowcharts_dot(proj: Project, out_dir: Path) -> dict[str, str]:
