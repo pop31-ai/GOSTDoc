@@ -15,7 +15,18 @@ def body_for(proj: Project, key: str) -> str:
     if key == "purpose":
         return f"Программа «{proj.name}» предназначена для обработки данных согласно техническому заданию."
     if key == "tech":
-        return "Требования к техническим средствам: ПЭВМ, ОС Windows/Linux, среда выполнения C++/Qt."
+        parts = ["Требования к техническим средствам: ПЭВМ, ОС Windows/Linux, среда выполнения C++/Qt."]
+        b = proj.build
+        if b.kind:
+            parts.append(f"Система сборки: {'CMake' if b.kind == 'cmake' else 'qmake'}"
+                         + (f" (версия {b.version})" if b.version else "") + ".")
+        if b.targets:
+            parts.append("Цели сборки: " + ", ".join(b.targets) + ".")
+        if b.qt_modules:
+            parts.append("Модули Qt: " + ", ".join(b.qt_modules) + ".")
+        if b.dependencies:
+            parts.append("Внешние зависимости: " + ", ".join(b.dependencies) + ".")
+        return " ".join(parts)
     if key == "description":
         parts = [f"Программа содержит {len(proj.classes)} классов и {len(proj.functions)} свободных функций."]
         for cls in proj.classes:
@@ -64,7 +75,32 @@ def body_for(proj: Project, key: str) -> str:
                 f"{n_methods} методов, {len(proj.functions)} свободных функций, "
                 f"{len(proj.call_edges)} связей вызовов. Назначение модулей и функции "
                 "приведены в приложении А.")
+    if key == "terms":
+        return glossary(proj)
     return ""
+
+
+def glossary(proj: Project) -> str:
+    """Термины и сокращения: идентификаторы программы и их назначение."""
+    lines: list[str] = []
+    for cls in proj.classes:
+        desc = f"класс{(' «' + cls.base + '»') if cls.base else ''}"
+        lines.append(f"{cls.name} — {desc}{('; ' + cls.comment) if cls.comment else ''}.")
+    for fn in proj.functions:
+        role = "главная функция" if fn.name == "main" else "функция"
+        lines.append(f"{fn.name}() — {role}"
+                     + (f"; {fn.brief}" if fn.brief else "")
+                     + ".")
+    for cls in proj.classes:
+        for m in cls.methods:
+            if not m.brief:
+                continue
+            kind = {"signal": "сигнал", "slot": "слот"}.get(m.kind, "метод")
+            lines.append(f"{cls.name}::{m.name}() — {kind} «{m.brief}».")
+    if proj.build.qt_modules:
+        lines.append("Qt — библиотека классов; используются модули: "
+                     + ", ".join(proj.build.qt_modules) + ".")
+    return " ".join(lines)
 
 
 # шапка листа регистрации изменений (ГОСТ 2.105)

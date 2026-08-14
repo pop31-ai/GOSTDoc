@@ -45,6 +45,16 @@ def render_txt(proj: Project, out_path: Path, doc_code: str = "19.402") -> Path:
     lines.append("")
     lines.append("Приложение А. Структура программы")
     lines.append("=" * 72)
+    b = proj.build
+    if b.kind:
+        lines.append(f"Система сборки: {'CMake' if b.kind == 'cmake' else 'qmake'}"
+                     + (f" {b.version}" if b.version else ""))
+        if b.targets:
+            lines.append(f"Цели: {', '.join(b.targets)}")
+        if b.qt_modules:
+            lines.append(f"Модули Qt: {', '.join(b.qt_modules)}")
+        if b.dependencies:
+            lines.append(f"Зависимости: {', '.join(b.dependencies)}")
     for cls in proj.classes:
         lines.append(f"\nКласс {cls.name}" + (f" : {cls.base}" if cls.base else ""))
         if cls.comment:

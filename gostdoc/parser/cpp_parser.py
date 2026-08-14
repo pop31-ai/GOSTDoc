@@ -316,8 +316,11 @@ def parse_project(src_dir: str | Path, name: str = "", author: str = "",
                   organisation: str = "", comment: str = "") -> Project:
     """Рекурсивно парсит все C++-исходники в каталоге."""
     src_dir = Path(src_dir)
-    proj = Project(name=name or src_dir.name, author=author,
-                   organisation=organisation, comment=comment)
+    from .build_parser import parse_build
+
+    build = parse_build(src_dir)
+    proj = Project(name=name or build.name or src_dir.name, author=author,
+                   organisation=organisation, comment=comment, build=build)
     suffixes = (".cpp", ".cc", ".h", ".hpp")
     files = sorted(p for p in src_dir.rglob("*") if p.suffix.lower() in suffixes)
     for path in files:

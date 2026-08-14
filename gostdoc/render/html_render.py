@@ -51,6 +51,16 @@ def render_html(proj: Project, out_path: Path, diagrams: dict | None = None,
 
     b.append('<h3>Приложение А. Структура программы</h3>')
     fig = 1
+    bl = proj.build
+    if bl.kind:
+        b.append(f'<p><b>Система сборки:</b> {"CMake" if bl.kind == "cmake" else "qmake"}'
+                 + (f' {_esc(bl.version)}' if bl.version else '') + '</p>')
+        if bl.targets:
+            b.append(f'<p><b>Цели:</b> {_esc(", ".join(bl.targets))}</p>')
+        if bl.qt_modules:
+            b.append(f'<p><b>Модули Qt:</b> {_esc(", ".join(bl.qt_modules))}</p>')
+        if bl.dependencies:
+            b.append(f'<p><b>Зависимости:</b> {_esc(", ".join(bl.dependencies))}</p>')
     for img_key, cap in (("classes", "Рисунок А.1 — Диаграмма классов"),
                          ("calls", "Рисунок А.2 — Граф вызовов")):
         data = _img_b64(diagrams.get(img_key)) if diagrams else None

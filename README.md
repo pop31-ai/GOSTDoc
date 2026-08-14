@@ -109,17 +109,24 @@ gostdoc-gui
 - лист регистрации изменений (ГОСТ 2.105) в конце каждого документа;
 - Doxygen-комментарии: `@brief`, `@param`, `@return` попадают в структуру программы;
 - разбор: классы, методы, конструкторы/деструкторы, перегрузка операторов,
-  перечисления (enum), typedef/using, пространства имён, условия и вызовы.
+  перечисления (enum), typedef/using, пространства имён, условия и вызовы;
+- система сборки: парсер `CMakeLists.txt` и `*.pro` (qmake) — имя проекта,
+  версия, цели, модули Qt и внешние зависимости попадают в документы и JSON;
+- глоссарий терминов (раздел «Термины и сокращения» в 19.404) формируется
+  автоматически из идентификаторов и Doxygen-описаний;
+- релизы: workflow собирает wheel + sdist и standalone `.exe` (Windows)
+  и выкладывает их в GitHub Releases по тегу `v*`.
 
 ## Структура
 
 ```
 gostdoc/
   cli.py           # точка входа
-  parser/          # разбор C++/Qt (классы, методы, вызовы, Qt-сигналы/слоты)
+  parser/          # разбор C++/Qt (классы, методы, вызовы, Qt-сигналы/слоты,
+                   #   сборка: CMakeLists.txt и *.pro)
   grapher/         # схемы (Graphviz DOT + fallback на Pillow)
   styles/          # константы ГОСТ-оформления
-  render/          # рендеры: docx, pdf, txt
+  render/          # рендеры: docx, pdf, txt, html
   nn/              # 23 нейросети + обучение (net, nets, feat, train, pipeline)
 examples/          # тестовые C++/Qt проекты
 tests/             # юнит-тесты
@@ -136,7 +143,7 @@ pytest
 
 ```bash
 python -m build        # создаёт sdist + wheel
-pip install dist/gostdoc-0.2.0-py3-none-any.whl
+pip install dist/gostdoc-0.4.0-py3-none-any.whl
 ```
 
 Standalone `.exe` (Windows, без Python):
@@ -145,6 +152,9 @@ Standalone `.exe` (Windows, без Python):
 build.bat
 dist\gostdoc.exe --version
 ```
+
+Релизы: тег `git tag v0.4.0 && git push --tags` — GitHub Actions соберёт
+wheel, sdist и `.exe` и выложит их в GitHub Releases.
 
 ## Конфигурация
 

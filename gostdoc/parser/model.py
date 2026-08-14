@@ -53,6 +53,17 @@ class TypeDef:
 
 
 @dataclass
+class BuildInfo:
+    """Сведения о системе сборки (CMake или qmake)."""
+    kind: str = ""  # cmake / qmake
+    name: str = ""
+    version: str = ""
+    targets: list[str] = field(default_factory=list)
+    qt_modules: list[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+
+
+@dataclass
 class Project:
     name: str
     author: str = ""
@@ -66,6 +77,7 @@ class Project:
     enums: list[Enum] = field(default_factory=list)
     typedefs: list[TypeDef] = field(default_factory=list)
     namespaces: list[str] = field(default_factory=list)
+    build: BuildInfo = field(default_factory=BuildInfo)
 
     def all_functions(self) -> list[Function]:
         out = list(self.functions)

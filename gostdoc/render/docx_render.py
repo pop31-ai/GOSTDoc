@@ -103,6 +103,18 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None,
     h = doc.add_paragraph()
     h.add_run("Приложение А. Структура программы").bold = True
 
+    b = proj.build
+    if b.kind:
+        p = doc.add_paragraph()
+        p.add_run(f"Система сборки: {'CMake' if b.kind == 'cmake' else 'qmake'}"
+                  + (f" {b.version}" if b.version else "")).bold = True
+        if b.targets:
+            doc.add_paragraph("Цели: " + ", ".join(b.targets))
+        if b.qt_modules:
+            doc.add_paragraph("Модули Qt: " + ", ".join(b.qt_modules))
+        if b.dependencies:
+            doc.add_paragraph("Зависимости: " + ", ".join(b.dependencies))
+
     if diagrams and diagrams.get("classes"):
         doc.add_picture(str(diagrams["classes"]), width=Cm(16))
         doc.add_paragraph("Рисунок А.1 — Диаграмма классов")

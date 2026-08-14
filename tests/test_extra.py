@@ -247,3 +247,51 @@ def test_revision_register(tmp_path: Path):
     txt = results[0].read_text(encoding="utf-8")
     assert "Лист регистрации изменений" in txt
     assert "Номер изм." in txt
+
+
+CMAKE = """
+cmake_minimum_required(VERSION 3.16)
+project(MyApp VERSION 2.1.0 LANGUAGES CXX)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+qt_add_executable(MyApp main.cpp)
+target_link_libraries(MyApp PRIVATE Qt6::Widgets)
+"""
+
+
+def test_parse_cmake(tmp_path: Path):
+    (tmp_path / "CMakeLists.txt").write_text(CMAKE, encoding="utf-8")
+    (tmp_path / "main.cpp").write_text("int main() { return 0; }", encoding="utf-8")
+    from gostdoc.parser.cpp_parser import parse_project
+    proj = parse_project(tmp_path)
+    assert proj.build.kind == "cmake"
+    assert proj.build.name == "MyApp"
+    assert proj.build.version == "2.1.0"
+    assert proj.build.targets == ["MyApp"]
+    assert proj.build.qt_modules == ["Widgets", "Network"]
+
+
+def test_parse_pro(tmp_path: Path):
+    (tmp_path / "app.pro").write_text(
+        "TARGET = MyApp\nQT += core gui widgets\n", encoding="utf-8")
+    from gostdoc.parser.build_parser import parse_build
+    info = parse_build(tmp_path)
+    assert info.kind == "qmake"
+    assert info.name == "MyApp"
+    assert info.qt_modules == ["core", "gui", "widgets"] or \
+        {"core", "gui", "widgets"} <= set(info.qt_modules)
+
+
+def test_sample_uses_cmake():
+    from gostdoc.parser.cpp_parser import parse_project
+    proj = parse_project(Path("examples/sample"))
+    assert proj.build.kind == "cmake"
+    assert proj.build.name == "SampleApp"
+    assert "Widgets" in proj.build.qt_modules
+
+
+def test_glossary_19_404(tmp_path: Path):
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("txt",), name="G", doctype="19.404")
+    text = results[0].read_text(encoding="utf-8")
+    assert "Термины и сокращения" in text
+    assert "MainWindow" in text

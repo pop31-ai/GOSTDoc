@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gostdoc"
-version = "0.3.0"
+version = "0.4.0"
 description = "Генератор документации по ГОСТ 19 для программ на C++/Qt (PDF, DOCX, TXT)"
 readme = "README.md"
 requires-python = ">=3.9"
