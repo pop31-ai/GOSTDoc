@@ -108,6 +108,21 @@ def render_pdf(proj: Project, out_path: Path, diagrams: dict | None = None) -> P
             para(f"{r.net_name} [score={r.score}]", bold=True)
             para(r.text)
 
+    if proj.sources:
+        pdf.add_page()
+        para("Приложение В. Текст программы (ГОСТ 19.401)", bold=True)
+        for src in proj.sources:
+            para(f"Файл: {src}", bold=True)
+            try:
+                code = Path(src).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for i, line in enumerate(code.splitlines(), start=1):
+                pdf.set_font("GOST", "", 9)
+                pdf.multi_cell(0, 4.5, f"{i:>5} | {line}",
+                               new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("GOST", "", STYLE.font_size)
+
     pdf.output(str(out_path))
     return out_path
 

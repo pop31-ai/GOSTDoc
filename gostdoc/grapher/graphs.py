@@ -23,13 +23,38 @@ def _dot_available() -> bool:
     return shutil.which("dot") is not None
 
 
+def _simple() -> bool:
+    try:
+        import PIL  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _fallback(out_dir: Path):
+    """Импорт простого рендера Pillow (используется без Graphviz)."""
+    from .simple import class_diagram as cd
+    from .simple import call_graph as cg
+    from .simple import flowcharts as fc
+    return cd, cg, fc
+
+
 def _gost_node_style():
     return dict(shape="box", fontname="Arial", fontsize="10", color="#000000")
 
 
 def class_diagram(proj: Project, out_dir: Path) -> str | None:
     """UML-диаграмма классов. Возвращает путь к PNG или None."""
-    if graphviz is None or not _dot_available() or not proj.classes:
+    if graphviz is not None and _dot_available():
+        return _class_diagram_dot(proj, out_dir)
+    if _simple():
+        cd, _cg, _fc = _fallback(out_dir)
+        return cd(proj, out_dir)
+    return None
+
+
+def _class_diagram_dot(proj: Project, out_dir: Path) -> str | None:
+    if not proj.classes:
         return None
     g = graphviz.Digraph("classes", format="png")
     g.attr(rankdir="TB", splines="ortho", nodesep="0.3", ranksep="0.35")
@@ -53,7 +78,16 @@ def class_diagram(proj: Project, out_dir: Path) -> str | None:
 
 def call_graph(proj: Project, out_dir: Path) -> str | None:
     """Граф вызовов функций и методов. Возвращает путь к PNG или None."""
-    if graphviz is None or not _dot_available() or not proj.call_edges:
+    if graphviz is not None and _dot_available():
+        return _call_graph_dot(proj, out_dir)
+    if _simple():
+        _cd, cg, _fc = _fallback(out_dir)
+        return cg(proj, out_dir)
+    return None
+
+
+def _call_graph_dot(proj: Project, out_dir: Path) -> str | None:
+    if not proj.call_edges:
         return None
     g = graphviz.Digraph("calls", format="png")
     g.attr(rankdir="LR", nodesep="0.25", ranksep="0.5")
@@ -69,8 +103,15 @@ def call_graph(proj: Project, out_dir: Path) -> str | None:
 
 def flowcharts(proj: Project, out_dir: Path) -> dict[str, str]:
     """Блок-схемы функций по ГОСТ 19.701 (старт / вызовы / конец)."""
-    if graphviz is None or not _dot_available():
-        return {}
+    if graphviz is not None and _dot_available():
+        return _flowcharts_dot(proj, out_dir)
+    if _simple():
+        _cd, _cg, fc = _fallback(out_dir)
+        return fc(proj, out_dir)
+    return {}
+
+
+def _flowcharts_dot(proj: Project, out_dir: Path) -> dict[str, str]:
     results: dict[str, str] = {}
     for f in proj.all_functions():
         if not f.calls:

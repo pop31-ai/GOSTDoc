@@ -117,6 +117,25 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None) -> 
             p.add_run(f"{r.net_name} [score={r.score}]").bold = True
             doc.add_paragraph(r.text, style="List Bullet")
 
+    if proj.sources:
+        h = doc.add_paragraph()
+        h.add_run("Приложение В. Текст программы (ГОСТ 19.401)").bold = True
+        from docx.shared import Pt as _Pt
+        for src in proj.sources:
+            p = doc.add_paragraph()
+            p.add_run(f"Файл: {src}").bold = True
+            try:
+                code = Path(src).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for i, line in enumerate(code.splitlines(), start=1):
+                lp = doc.add_paragraph(f"{i:>5} | {line}")
+                lp.paragraph_format.first_line_indent = Cm(0)
+                lp.paragraph_format.line_spacing = 1.0
+                for run in lp.runs:
+                    run.font.name = "Courier New"
+                    run.font.size = _Pt(10)
+
     doc.save(str(out_path))
     return out_path
 

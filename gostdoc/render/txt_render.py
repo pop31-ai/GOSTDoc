@@ -69,6 +69,21 @@ def render_txt(proj: Project, out_path: Path) -> Path:
             lines.append(f"  {r.net_name}  [score={r.score}]")
             lines.append(f"    {r.text}")
 
+    if proj.sources:
+        lines.append("")
+        lines.append("Приложение В. Текст программы (ГОСТ 19.401)")
+        lines.append("=" * 72)
+        for src in proj.sources:
+            lines.append("")
+            lines.append(f"Файл: {src}")
+            lines.append("-" * 40)
+            try:
+                code = Path(src).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for i, line in enumerate(code.splitlines(), start=1):
+                lines.append(f"{i:>5} | {line}")
+
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out_path
 
