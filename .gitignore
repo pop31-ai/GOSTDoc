@@ -7,3 +7,7 @@ dist/
 *.egg-info/
 docs_nn/
 docs_test/
+docs_cfg/
+build/
+dist/
+*.spec

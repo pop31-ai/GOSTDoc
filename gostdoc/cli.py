@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import json
 import tempfile
 from pathlib import Path
 
 from . import __version__
 from .grapher.graphs import call_graph, class_diagram, flowcharts
 from .parser.cpp_parser import parse_project
+
+_CONFIG_NAME = ".gostdoc.json"
+_KEYS = ("project", "out", "format", "name", "author", "organisation",
+         "comment", "nn")
 
 
 def build_docs(project: str, out: str, fmt: tuple[str, ...],
@@ -78,14 +83,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--comment", default="", help="аннотация к программе")
     parser.add_argument("--nn", action="store_true",
                         help="запустить 23 нейросети для анализа и вывод в документ")
+    parser.add_argument("--config", "-c", default="",
+                        help="файл конфигурации (.gostdoc.json)")
     args = parser.parse_args(argv)
 
-    fmt = tuple(x.strip().lower() for x in args.format.split(",") if x.strip())
+    # конфигурация: файл -> аргументы (файл имеет приоритет над дефолтами)
+    cfg: dict = {}
+    cfg_path = Path(args.config) if args.config else Path(_CONFIG_NAME)
+    if cfg_path.exists():
+        raw = cfg_path.read_bytes()
+        for enc in ("utf-8-sig", "utf-8", "cp1251"):
+            try:
+                cfg = json.loads(raw.decode(enc))
+                break
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+    resolved = {k: getattr(args, k) for k in _KEYS}
+    resolved.update({k: v for k, v in cfg.items() if v not in (None, "")})
+    resolved["nn"] = bool(resolved.get("nn"))
+    resolved["format"] = tuple(x.strip().lower() for x in resolved["format"].split(",")
+                               if x.strip())
     try:
-        results = build_docs(args.project, args.out, fmt,
-                             name=args.name, author=args.author,
-                             organisation=args.organisation, comment=args.comment,
-                             nn=args.nn)
+        results = build_docs(resolved["project"], resolved["out"], resolved["format"],
+                             name=resolved["name"], author=resolved["author"],
+                             organisation=resolved["organisation"],
+                             comment=resolved["comment"], nn=resolved["nn"])
     except Exception as e:  # noqa: BLE001
         parser.error(f"ошибка: {e}")
 

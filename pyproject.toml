@@ -27,6 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 gui = ["PySide6>=6.5"]
+dist = ["pyinstaller>=6.0"]
 
 [project.scripts]
 gostdoc = "gostdoc.cli:main"

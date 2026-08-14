@@ -32,7 +32,17 @@ def render_pdf(proj: Project, out_path: Path, diagrams: dict | None = None) -> P
     if font is None:
         raise RuntimeError("Кириллический TTF-шрифт не найден; установите Times New Roman или DejaVu.")
 
-    pdf = FPDF(unit="mm", format="A4")
+    class GOSTPDF(FPDF):
+        """Нумерация страниц по ГОСТ 2.105 — по центру нижней части листа."""
+
+        def footer(self):
+            if self.page_no() <= 1:
+                return
+            self.set_y(-12)
+            self.set_font("GOST", "", 12)
+            self.cell(0, 6, str(self.page_no()), align="C")
+
+    pdf = GOSTPDF(unit="mm", format="A4")
     pdf.set_margins(STYLE.margin_left_mm, STYLE.margin_top_mm, STYLE.margin_right_mm)
     pdf.set_auto_page_break(auto=True, margin=STYLE.margin_bottom_mm)
     pdf.add_font("GOST", "", str(font))

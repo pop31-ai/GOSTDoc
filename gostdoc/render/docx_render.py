@@ -8,6 +8,24 @@ from ..parser.model import Project
 from ..styles.gost_styles import STYLE, GOST19_402_SECTIONS
 
 
+def _add_page_numbers(doc) -> None:
+    """Номер страницы по центру нижнего поля (ГОСТ 2.105)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    footer = doc.sections[0].footer
+    p = footer.paragraphs[0]
+    p.alignment = 1  # CENTER
+    run = p.add_run()
+    fld_char1 = OxmlElement("w:fldChar"); fld_char1.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText"); instr.set(qn("xml:space"), "preserve")
+    instr.text = "PAGE"
+    fld_char2 = OxmlElement("w:fldChar"); fld_char2.set(qn("w:fldCharType"), "end")
+    run._r.append(fld_char1)
+    run._r.append(instr)
+    run._r.append(fld_char2)
+
+
 def _section_num(i: int) -> str:
     return f"{i}"
 
@@ -24,6 +42,8 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None) -> 
     sec.right_margin = Mm(STYLE.margin_right_mm)
     sec.top_margin = Mm(STYLE.margin_top_mm)
     sec.bottom_margin = Mm(STYLE.margin_bottom_mm)
+
+    _add_page_numbers(doc)
 
     style = doc.styles["Normal"]
     style.font.name = STYLE.font_ru
