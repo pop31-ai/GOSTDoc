@@ -140,36 +140,54 @@ def call_graph(proj: Project, out_dir: Path) -> str | None:
     return str(out) + ".png"
 
 
-def flowchart(name: str, calls: list[str], out_dir: Path) -> str | None:
-    """Блок-схема функции по ГОСТ 19.701: Начало -> вызовы -> Конец."""
+def flowchart(name: str, calls: list[str], conditions: list[str],
+              out_dir: Path) -> str | None:
+    """Блок-схема функции по ГОСТ 19.701: Начало -> узлы -> Конец.
+    Вызовы — прямоугольники, условия — ромбы."""
     if not calls:
         return None
     font = _font(11)
-    bw, bh, gap = 180, 36, 26
-    w = bw + 120
-    h = (len(calls) + 2) * (bh + gap) + 40
+    bw, bh, dh, gap = 200, 36, 52, 26
+    steps = [("c", c) for c in calls] + [("d", c) for c in conditions]
+    n = max(len(calls), len(conditions), 1)
+    h = (n + 2) * (bh + gap) + 40 + (len(conditions) * 8)
+    w = bw + 180
     img = Image.new("RGB", (w, h), _BG)
     draw = ImageDraw.Draw(img)
     x = (w - bw) // 2
 
-    def ellipse(y, text, w_=120):
+    def ellipse(y, text, w_=110):
         ex = (w - w_) // 2
         lines = _text_wrap(text, font, w_ - 14)
         draw.ellipse([ex, y, ex + w_, y + bh], outline=_LINE, width=2)
         for i, ln in enumerate(lines):
-            tw, th = _text_size(draw, ln, font)
+            tw, th_ = _text_size(draw, ln, font)
             draw.text((ex + (w_ - tw) // 2, y + 10 + i * 16), ln, font=font, fill=_LINE)
-        return w_
+
+    def diamond(y, text):
+        half = bw // 2
+        top, bot = (x + half, y), (x + half, y + dh)
+        lft, rgt = (x, y + dh // 2), (x + bw, y + dh // 2)
+        draw.polygon([top, rgt, bot, lft], outline=_LINE, fill=_BG, width=2)
+        lines = _text_wrap(text, font, bw - 40)
+        for i, ln in enumerate(lines):
+            tw, th_ = _text_size(draw, ln, font)
+            draw.text((x + half - tw // 2, y + dh // 2 - 8 + i * 14), ln, font=font, fill=_LINE)
 
     y = 20
     ellipse(y, "Начало", 110)
     y += bh + gap
     prev = (x + bw // 2, y - gap)
-    for c in calls:
-        lines = _text_wrap(c, font, bw - 12)
-        _draw_box(draw, x, y, bw, bh, lines, font)
-        _arrow(draw, prev[0], prev[1] + bh // 2, x + bw // 2, y - gap // 2 - 4)
-        y += bh + gap
+    for kind, text in steps:
+        if kind == "d":
+            diamond(y, f"{text}?")
+            _arrow(draw, prev[0], prev[1] + bh // 2, x + bw // 2, y - gap // 2 - 4)
+            y += dh + gap
+        else:
+            lines = _text_wrap(text, font, bw - 12)
+            _draw_box(draw, x, y, bw, bh, lines, font)
+            _arrow(draw, prev[0], prev[1] + bh // 2, x + bw // 2, y - gap // 2 - 4)
+            y += bh + gap
         prev = (x + bw // 2, y - gap)
     ellipse(y, "Конец", 110)
     _arrow(draw, prev[0], prev[1] + bh // 2, w // 2, y)
@@ -181,6 +199,6 @@ def flowchart(name: str, calls: list[str], out_dir: Path) -> str | None:
 def flowcharts(proj: Project, out_dir: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     for f in proj.all_functions():
-        if f.calls:
-            out[f.name] = flowchart(f.name, f.calls, out_dir)
+        if f.calls or f.conditions:
+            out[f.name] = flowchart(f.name, f.calls, f.conditions, out_dir)
     return out

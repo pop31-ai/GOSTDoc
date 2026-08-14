@@ -114,15 +114,19 @@ def flowcharts(proj: Project, out_dir: Path) -> dict[str, str]:
 def _flowcharts_dot(proj: Project, out_dir: Path) -> dict[str, str]:
     results: dict[str, str] = {}
     for f in proj.all_functions():
-        if not f.calls:
+        if not f.calls and not f.conditions:
             continue
         g = graphviz.Digraph(f.name, format="png")
         g.attr(rankdir="TB", nodesep="0.3", ranksep="0.35", margin="0.1")
         g.node("start", label="Начало", shape="ellipse")
         prev = "start"
-        for i, c in enumerate(f.calls):
-            node = f"c{i}"
-            g.node(node, label=c, shape="box")
+        steps = [("c", c) for c in f.calls] + [("d", c) for c in f.conditions]
+        for i, (kind, text) in enumerate(steps):
+            node = f"n{i}"
+            if kind == "d":
+                g.node(node, label=text + "?", shape="diamond")
+            else:
+                g.node(node, label=text, shape="box")
             g.edge(prev, node)
             prev = node
         g.node("end", label="Конец", shape="ellipse")

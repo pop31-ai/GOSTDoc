@@ -49,6 +49,21 @@ def _extract_call_names(block: str) -> list[str]:
     return names
 
 
+_COND_RE = re.compile(r"\b(if|while|for)\s*\(([^()]*)\)")
+
+
+def _extract_conditions(block: str) -> list[str]:
+    """Условия ветвлений/циклов в теле функции (ГОСТ 19.701 — ромбы)."""
+    body = _COMMENT_LINE_RE.sub("", block)
+    body = _strip_literals(body)
+    out: list[str] = []
+    for m in _COND_RE.finditer(body):
+        text = f"{m.group(1)} {m.group(2)}".strip()
+        if text not in out:
+            out.append(text)
+    return out
+
+
 def _parse_params(params: str) -> list[str]:
     return [p.strip() for p in params.split(",") if p.strip() and p.strip() != "..."]
 
@@ -145,7 +160,9 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                             if depth == 0 and j > k:
                                 break
                             j += 1
-                        func.calls = _extract_call_names("\n".join(bl[k + 1:j]))
+                        body_txt = "\n".join(bl[k + 1:j])
+                        func.calls = _extract_call_names(body_txt)
+                        func.conditions = _extract_conditions(body_txt)
                     methods.append(func)
                     continue
                 cm = _CTOR_RE.match(line)
@@ -195,6 +212,7 @@ def parse_project(src_dir: str | Path, name: str = "", author: str = "",
                     for f in cls.methods:
                         if f.name == fname:
                             f.calls = calls
+                            f.conditions = _extract_conditions(m.group(5))
                             f.file = path.name
         for m in re.finditer(
                 r"^([\w:<>,&\*]+)\s+(\w+)\s*\(([^;{}]*)\)\s*(?:const)?\s*\{(.*?)\n\}",
@@ -205,7 +223,8 @@ def parse_project(src_dir: str | Path, name: str = "", author: str = "",
             proj.functions.append(Function(
                 name=fname, return_type=m.group(1).strip(),
                 params=_parse_params(m.group(3)), file=path.name,
-                is_method=False, calls=_extract_call_names(m.group(4))))
+                is_method=False, calls=_extract_call_names(m.group(4)),
+                conditions=_extract_conditions(m.group(4))))
 
     # собираем граф вызовов
     known = {f.name for f in proj.all_functions()}

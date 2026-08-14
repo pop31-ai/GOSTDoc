@@ -45,7 +45,22 @@ def build_docs(project: str, out: str, fmt: tuple[str, ...],
             elif f == "txt":
                 from .render.txt_render import render_txt
                 results.append(render_txt(proj, out_dir / f"{proj.name}.txt"))
+            elif f == "json":
+                results.append(_render_json(proj, out_dir / f"{proj.name}.json"))
     return results
+
+
+def _render_json(proj: Project, out_path: Path) -> Path:
+    import json
+    from dataclasses import asdict
+
+    data = asdict(proj)
+    data["nn_results"] = [
+        {"net": r.net_name, "category": r.category, "score": r.score, "text": r.text}
+        for r in proj.nn_results
+    ]
+    out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out_path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project", "-p", default=".", help="каталог с исходниками C++")
     parser.add_argument("--out", "-o", default="./docs", help="каталог для документации")
     parser.add_argument("--format", "-f", default="pdf,docx,txt",
-                        help="форматы: pdf,docx,txt через запятую")
+                        help="форматы: pdf,docx,txt,json через запятую")
     parser.add_argument("--name", default="", help="название программы")
     parser.add_argument("--author", default="", help="разработчик")
     parser.add_argument("--organisation", default="", help="организация")

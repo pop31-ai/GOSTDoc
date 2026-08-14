@@ -26,9 +26,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
+gui = ["PySide6>=6.5"]
 
 [project.scripts]
 gostdoc = "gostdoc.cli:main"
+gostdoc-gui = "gostdoc.gui:run_gui"
 
 [tool.setuptools.packages.find]
 include = ["gostdoc*"]

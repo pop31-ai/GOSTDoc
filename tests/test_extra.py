@@ -63,3 +63,21 @@ def test_build_docs_all_formats(tmp_path: Path):
     assert files == {".txt", ".docx", ".pdf"}
     for r in results:
         assert r.exists() and r.stat().st_size > 0
+
+
+def test_build_docs_json(tmp_path: Path):
+    import json
+    results = build_docs(str(Path("examples/sample")), str(tmp_path / "out"),
+                         ("json",), name="J")
+    data = json.loads(results[0].read_text(encoding="utf-8"))
+    assert data["name"] == "J"
+    assert len(data["classes"]) >= 1
+
+
+def test_conditions_extracted():
+    from gostdoc.parser.cpp_parser import _extract_conditions
+    src = "if (x > 0) {} while (y) {} for (int i = 0; i < n; i++) {}"
+    conds = _extract_conditions(src)
+    assert any("if x > 0" in c for c in conds)
+    assert any("while y" in c for c in conds)
+    assert any("for" in c for c in conds)

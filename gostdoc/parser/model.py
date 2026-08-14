@@ -16,6 +16,7 @@ class Function:
     is_method: bool = False
     comment: str = ""
     calls: list[str] = field(default_factory=list)
+    conditions: list[str] = field(default_factory=list)
 
 
 @dataclass
