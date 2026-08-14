@@ -39,7 +39,6 @@ def render_txt(proj: Project, out_path: Path) -> Path:
         lines.append("-" * 40)
         lines.append(_body_for(proj, num))
 
-    lines.append("")
     lines.append("Приложение А. Структура программы")
     lines.append("=" * 72)
     for cls in proj.classes:
@@ -57,6 +56,18 @@ def render_txt(proj: Project, out_path: Path) -> Path:
         lines.append(f"  {fn.return_type} {fn.name}({', '.join(fn.params)})")
         for c in fn.calls:
             lines.append(f"        -> {c}()")
+
+    if proj.nn_results:
+        lines.append("")
+        lines.append("Приложение Б. Результаты нейросетевого анализа (23 сети)")
+        lines.append("=" * 72)
+        current = None
+        for r in proj.nn_results:
+            if r.category != current:
+                current = r.category
+                lines.append(f"\n{current.upper()}")
+            lines.append(f"  {r.net_name}  [score={r.score}]")
+            lines.append(f"    {r.text}")
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out_path

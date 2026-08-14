@@ -21,7 +21,20 @@ pip install -e .
 ```bash
 gostdoc --project ./src --out ./docs --format pdf,docx,txt \
         --name "Моя программа" --author "Иванов И.И." \
-        --organisation "ООО «Пример»"
+        --organisation "ООО «Пример»" --nn
+```
+
+Флаг `--nn` запускает 23 нейросети, которые анализируют код и добавляют
+в документ приложение «Результаты нейросетевого анализа» (схемы, оценки
+сложности, покрытие комментариями, соответствие ГОСТ, тест-кейсы,
+трудозатраты и др.).
+
+Переобучение нейросетей в консоли:
+
+```bash
+python -m gostdoc.nn.train --data data.csv \
+       --projects examples/sample examples/alt \
+       --out gostdoc/nn/weights.py
 ```
 
 Параметры:
@@ -34,7 +47,22 @@ gostdoc --project ./src --out ./docs --format pdf,docx,txt \
 | `--name` | имя каталога | название программы |
 | `--author` | пусто | разработчик |
 | `--organisation` | пусто | организация |
+| `--organisation` | пусто | организация |
 | `--comment` | пусто | аннотация |
+| `--nn` | выкл | запуск 23 нейросетей анализа |
+
+## Нейросети (23 модели)
+
+| Категория | Сети |
+|---|---|
+| Генерация текста | ClassCommenter, MethodSummarizer, ProgramAnnotator, SectionWriter, GlossaryExtractor, TitlePageGenerator |
+| Анализ кода | CodeClassifier, ComplexityEstimator, DependencyAnalyzer, DuplicateDetector, ReadabilityScorer, NamingQualityChecker, CommentCoverageAnalyzer, QtSignalSlotMatcher, FunctionRoleTagger |
+| Схемы и структура | FlowchartGenerator, ClassDiagramBuilder, CallGraphNet, ArchitectureCluster, SequenceDiagramGenerator |
+| Контроль качества | GOSTComplianceChecker, TestcaseGenerator, EffortEstimator |
+
+Модели — линейные/логистические сети с откалиброванными весами
+(`gostdoc/nn/weights.py`), без ML-зависимостей. Вход: признаки проекта
+(число классов, функций, вызовов, строк, комментариев и т.п.).
 
 ## Оформление по ГОСТ
 
@@ -53,7 +81,8 @@ gostdoc/
   grapher/         # схемы (Graphviz DOT)
   styles/          # константы ГОСТ-оформления
   render/          # рендеры: docx, pdf, txt
-examples/          # тестовый C++/Qt проект
+  nn/              # 23 нейросети + обучение (net, nets, feat, train, pipeline)
+examples/          # тестовые C++/Qt проекты
 tests/             # юнит-тесты
 ```
 

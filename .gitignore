@@ -5,3 +5,5 @@ docs/
 build/
 dist/
 *.egg-info/
+docs_nn/
+docs_test/

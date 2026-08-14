@@ -13,13 +13,19 @@ from .parser.cpp_parser import parse_project
 
 def build_docs(project: str, out: str, fmt: tuple[str, ...],
                name: str = "", author: str = "",
-               organisation: str = "", comment: str = "") -> list[Path]:
+               organisation: str = "", comment: str = "",
+               nn: bool = False) -> list[Path]:
     src = Path(project)
     out_dir = Path(out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     proj = parse_project(src, name=name, author=author,
                          organisation=organisation, comment=comment)
+
+    if nn:
+        from .nn import run_all, print_report
+        proj.nn_results = run_all(proj)
+        print_report(proj.nn_results)
 
     with tempfile.TemporaryDirectory() as td:
         tdir = Path(td)
@@ -55,13 +61,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--author", default="", help="разработчик")
     parser.add_argument("--organisation", default="", help="организация")
     parser.add_argument("--comment", default="", help="аннотация к программе")
+    parser.add_argument("--nn", action="store_true",
+                        help="запустить 23 нейросети для анализа и вывод в документ")
     args = parser.parse_args(argv)
 
     fmt = tuple(x.strip().lower() for x in args.format.split(",") if x.strip())
     try:
         results = build_docs(args.project, args.out, fmt,
                              name=args.name, author=args.author,
-                             organisation=args.organisation, comment=args.comment)
+                             organisation=args.organisation, comment=args.comment,
+                             nn=args.nn)
     except Exception as e:  # noqa: BLE001
         parser.error(f"ошибка: {e}")
 

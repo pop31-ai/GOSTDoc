@@ -39,6 +39,7 @@ class Project:
     classes: list[Class] = field(default_factory=list)
     functions: list[Function] = field(default_factory=list)
     call_edges: list[tuple[str, str]] = field(default_factory=list)
+    nn_results: list = field(default_factory=list)
 
     def all_functions(self) -> list[Function]:
         out = list(self.functions)

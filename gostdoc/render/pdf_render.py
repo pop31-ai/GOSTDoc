@@ -97,6 +97,17 @@ def render_pdf(proj: Project, out_path: Path, diagrams: dict | None = None) -> P
         for m in cls.methods:
             para(f"— {m.return_type} {m.name}({', '.join(m.params)})")
 
+    if proj.nn_results:
+        pdf.add_page()
+        para("Приложение Б. Результаты нейросетевого анализа (23 сети)", bold=True)
+        current = None
+        for r in proj.nn_results:
+            if r.category != current:
+                current = r.category
+                para(r.category.upper(), bold=True)
+            para(f"{r.net_name} [score={r.score}]", bold=True)
+            para(r.text)
+
     pdf.output(str(out_path))
     return out_path
 

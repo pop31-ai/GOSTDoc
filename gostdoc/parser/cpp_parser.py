@@ -17,7 +17,7 @@ _DECL_RE = re.compile(
     r"^\s*(?:(virtual|static|inline|explicit|const|friend)\s+)*"
     r"([\w:<>,&\*]+)\s+(\w+)\s*\(([^;{]*)\)\s*(?:const)?\s*(?:override)?\s*([;{])"
 )
-_CTOR_RE = re.compile(r"^\s*(\w+)\s*\(([^;{}]*)\)\s*([;{])")
+_CTOR_RE = re.compile(r"^\s*(?:(virtual|static|inline|explicit|friend)\s+)*(~?\w+)\s*\(([^;{}]*)\)\s*([;{])")
 _FIELD_RE = re.compile(r"^\s*([\w:<>,&\*]+)\s+(\w+)\s*(?:\[[^\]]*\])?\s*[;=]")
 _COMMENT_BLOCK_RE = re.compile(r"/\*(.*?)\*/", re.S)
 _COMMENT_LINE_RE = re.compile(r"//.*$", re.M)
@@ -151,7 +151,9 @@ def _parse_class_body(body: str, file: str, src_lines: list[str],
                 cm = _CTOR_RE.match(line)
                 if cm and not _DECL_RE.match(line):
                     func = Function(
-                        name=cm.group(1), return_type="", params=_parse_params(cm.group(2)),
+                        name=cm.group(2),
+                        return_type=(cm.group(1) + " " if cm.group(1) else ""),
+                        params=_parse_params(cm.group(3)),
                         file=file, line=lineno, is_method=True,
                         comment=_last_comment(src_lines, lineno))
                     methods.append(func)

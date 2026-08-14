@@ -104,6 +104,19 @@ def render_docx(proj: Project, out_path: Path, diagrams: dict | None = None) -> 
         doc.add_paragraph(f"Функция {fn.name}").bold = True
         doc.add_paragraph(f"{fn.return_type} {fn.name}({', '.join(fn.params)}) — файл {fn.file}:{fn.line}")
 
+    if proj.nn_results:
+        h = doc.add_paragraph()
+        h.add_run("Приложение Б. Результаты нейросетевого анализа (23 сети)").bold = True
+        current = None
+        for r in proj.nn_results:
+            if r.category != current:
+                current = r.category
+                p = doc.add_paragraph()
+                p.add_run(r.category.upper()).bold = True
+            p = doc.add_paragraph()
+            p.add_run(f"{r.net_name} [score={r.score}]").bold = True
+            doc.add_paragraph(r.text, style="List Bullet")
+
     doc.save(str(out_path))
     return out_path
 
