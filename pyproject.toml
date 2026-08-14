@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gostdoc"
+version = "0.1.0"
+description = "Генератор документации по ГОСТ 19 для программ на C++/Qt (PDF, DOCX, TXT)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "GOSTDoc Team" }]
+keywords = ["gost", "documentation", "c++", "qt", "pdf", "docx"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Documentation",
+]
+dependencies = [
+    "python-docx>=1.0",
+    "fpdf2>=2.7",
+    "graphviz>=0.20",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+gostdoc = "gostdoc.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gostdoc*"]
