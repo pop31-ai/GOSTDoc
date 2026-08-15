@@ -139,11 +139,22 @@ def main(argv: list[str] | None = None) -> int:
                         help="упаковать все сгенерированные документы в ZIP")
     parser.add_argument("--init", action="store_true",
                         help="создать шаблон конфигурации .gostdoc.json в текущем каталоге")
+    parser.add_argument("--check", action="store_true",
+                        help="проверить исходники на соответствие ЕСПД (без генерации)")
     args = parser.parse_args(argv)
 
     if args.init:
         _write_config_template()
         return 0
+
+    if args.check:
+        from .check import check_project, print_report
+        src = Path(args.project)
+        proj = parse_project(src, name=args.name, author=args.author,
+                             organisation=args.organisation, comment=args.comment)
+        report = check_project(proj)
+        print_report(report)
+        return 1 if report.errors else 0
 
     # конфигурация: файл -> аргументы (файл имеет приоритет над дефолтами)
     cfg: dict = {}

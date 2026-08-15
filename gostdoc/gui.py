@@ -15,7 +15,7 @@ def run_gui() -> int:
     try:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import (
-            QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+            QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
             QMainWindow, QMessageBox, QPlainTextEdit, QPushButton,
             QVBoxLayout, QWidget,
         )
@@ -69,8 +69,19 @@ def run_gui() -> int:
             self.cb_pdf = QCheckBox("PDF")
             self.cb_docx = QCheckBox("DOCX"); self.cb_docx.setChecked(True)
             self.cb_txt = QCheckBox("TXT")
+            self.cb_html = QCheckBox("HTML")
+            self.cb_md = QCheckBox("MD")
             self.cb_json = QCheckBox("JSON")
             self.cb_nn = QCheckBox("23 нейросети")
+            self.cb_zip = QCheckBox("ZIP")
+            self.combo_doctype = QComboBox()
+            self.combo_doctype.addItems(
+                ["19.301", "19.401", "19.402", "19.403", "19.404", "19.504", "19.505", "all"])
+            self.combo_doctype.setCurrentText("19.402")
+            r = QHBoxLayout()
+            r.addWidget(QLabel("Формат документа:"))
+            r.addWidget(self.combo_doctype)
+            lay.addLayout(r)
             lay.addLayout(self._fmt_row())
 
             self.btn = QPushButton("Сгенерировать документацию")
@@ -84,7 +95,9 @@ def run_gui() -> int:
         def _fmt_row(self):
             r = QHBoxLayout()
             r.addWidget(QLabel("Форматы:"))
-            for cb in (self.cb_pdf, self.cb_docx, self.cb_txt, self.cb_json, self.cb_nn):
+            for cb in (self.cb_pdf, self.cb_docx, self.cb_txt,
+                       self.cb_html, self.cb_md, self.cb_json,
+                       self.cb_nn, self.cb_zip):
                 r.addWidget(cb)
             r.addStretch(1)
             return r
@@ -92,7 +105,8 @@ def run_gui() -> int:
         def generate(self):
             fmt = [name for cb, name in
                    ((self.cb_pdf, "pdf"), (self.cb_docx, "docx"),
-                    (self.cb_txt, "txt"), (self.cb_json, "json"))
+                    (self.cb_txt, "txt"), (self.cb_html, "html"),
+                    (self.cb_md, "md"), (self.cb_json, "json"))
                    if cb.isChecked()]
             if not fmt:
                 QMessageBox.warning(self, "GOSTDoc", "Выберите хотя бы один формат")
@@ -106,7 +120,9 @@ def run_gui() -> int:
                                name=self.ed_name.text().strip(),
                                author=self.ed_author.text().strip(),
                                organisation=self.ed_org.text().strip(),
-                               nn=self.cb_nn.isChecked())
+                               nn=self.cb_nn.isChecked(),
+                               doctype=self.combo_doctype.currentText(),
+                               zip_out=self.cb_zip.isChecked())
             except Exception as e:  # noqa: BLE001
                 buf.write(f"\nОшибка: {e}")
             self.log.setPlainText(buf.getvalue())

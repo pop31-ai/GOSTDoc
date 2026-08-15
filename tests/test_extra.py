@@ -334,3 +334,26 @@ def test_cli_init(tmp_path: Path, monkeypatch):
     assert main(["--init"]) == 0
     cfg = (tmp_path / ".gostdoc.json").read_text(encoding="utf-8")
     assert "project" in cfg
+
+
+def test_check_issues(tmp_path: Path):
+    from gostdoc.check import check_project
+    from gostdoc.parser.cpp_parser import parse_project
+    (tmp_path / "buggy.h").write_text(
+        "// Класс без описания тела.\n"
+        "class A { // TODO: дописать\n"
+        "public:\n"
+        "    void f();\n"
+        "};\n", encoding="utf-8")
+    proj = parse_project(tmp_path)
+    report = check_project(proj)
+    assert any("TODO" in i.message for i in report.issues)
+    assert any(i.severity == "warning" for i in report.issues)
+
+
+def test_check_cli(tmp_path: Path, monkeypatch):
+    from gostdoc.cli import main
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "x.cpp").write_text(
+        "int main() { return 0; }\n", encoding="utf-8")
+    assert main(["--check", "--project", str(tmp_path)]) == 0
